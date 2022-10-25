@@ -1,3 +1,5 @@
+var LOG_INTERVAL_MS = 1000
+
 var data=[];
 var t_fps='60';
 var t_resolution='1920X1080';
@@ -31,80 +33,83 @@ var timer=setTimeout(function(){
 },10000)
 
 <!--setup the video element and attach it to the Dash player-->
-    function display(){
-        var datetime = new Date();
-        console.log(datetime)
-        var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
-        //var url = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
-        //var url = "http://localhost/manifest.mpd?t="+datetime; // localhost server
-        var player = dashjs.MediaPlayer().create();
-        player.updateSettings({
-		  streaming: {
-		    buffer:{
-		    	bufferToKeep: 20,
-		    	stableBufferTime: 20,
-    			bufferTimeAtTopQuality: 40,
-    			fastSwitchEnabled: true,
-    			initialBufferLevel: NaN
-		    }
-		  }
-        });
-        
-        player.initialize(document.querySelector("#video"), url, true);
-        player.on(dashjs.MediaPlayer.events["PLAYBACK_ENDED"], function () {
-    clearInterval(eventPoller);
-    clearInterval(bitrateCalculator);
-});
+function display(){
+    var datetime = new Date();
+    console.log(datetime)
+    var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
+    //var url = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
+    //var url = "http://localhost/manifest.mpd?t="+datetime; // localhost server
+    var player = dashjs.MediaPlayer().create();
+    player.updateSettings({
+        streaming: {
+        buffer:{
+            bufferToKeep: 20,
+            stableBufferTime: 20,
+            bufferTimeAtTopQuality: 40,
+            fastSwitchEnabled: true,
+            initialBufferLevel: NaN
+        }
+        }
+    });
+    
+    player.initialize(document.querySelector("#video"), url, true);
+    player.on(dashjs.MediaPlayer.events["PLAYBACK_ENDED"], function () {
+        clearInterval(eventPoller);
+        clearInterval(bitrateCalculator);
+    });
+    player.on(dashjs.MediaPlayer.events["BUFFER_EMPTY"], onStalled);
+    player.on(dashjs.MediaPlayer.events["BUFFER_LOADED"], onStarted);
+    player.on(dashjs.MediaPlayer.events["QUALITY_CHANGE_REQUESTED"], onQualityChanged);
 
-var eventPoller = setInterval(function () {
-    var streamInfo = player.getActiveStream().getStreamInfo();
-    var dashMetrics = player.getDashMetrics();
-    var dashAdapter = player.getDashAdapter();
+    var eventPoller = setInterval(function () {
+        var streamInfo = player.getActiveStream().getStreamInfo();
+        var dashMetrics = player.getDashMetrics();
+        var dashAdapter = player.getDashAdapter();
 
-    if (dashMetrics && streamInfo) {
-        const periodIdx = streamInfo.index;
-        var repSwitch = dashMetrics.getCurrentRepresentationSwitch('video', true);
-        var bufferLevel = dashMetrics.getCurrentBufferLevel('video', true);
-        var bitrate = repSwitch ? Math.round(dashAdapter.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
-        var adaptation = dashAdapter.getAdaptationForType(periodIdx, 'video', streamInfo);
-        var currentRep = adaptation.Representation_asArray.find(function (rep) {
-            return rep.id === repSwitch.to
-        })
-        var frameRate = currentRep.frameRate;
-        var resolution = currentRep.width + 'x' + currentRep.height;
-        var cur_biterate = player.getAverageThroughput('video', true);
+        if (dashMetrics && streamInfo) {
+            const periodIdx = streamInfo.index;
+            var repSwitch = dashMetrics.getCurrentRepresentationSwitch('video', true);
+            var bufferLevel = dashMetrics.getCurrentBufferLevel('video', true);
+            var bitrate = repSwitch ? Math.round(dashAdapter.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
+            var adaptation = dashAdapter.getAdaptationForType(periodIdx, 'video', streamInfo);
+            var currentRep = adaptation.Representation_asArray.find(function (rep) {
+                return rep.id === repSwitch.to
+            })
+            var frameRate = currentRep.frameRate;
+            var resolution = currentRep.width + 'x' + currentRep.height;
+            var cur_biterate = player.getAverageThroughput('video', true);
 
-        var t_time=document.getElementById('video').currentTime;
-
-
-
-        t_fps=frameRate;
-        t_resolution=resolution;
-        t_bitrate=bitrate;
-        t_bufferLevel=bufferLevel;
-
-        temp_data=t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel+'\n';
-        data.push(temp_data);
+            var t_time=document.getElementById('video').currentTime;
 
 
-        document.getElementById('bufferLevel').innerText = bufferLevel + " secs";
-        document.getElementById('framerate').innerText = frameRate + " fps";
-        document.getElementById('reportedBitrate').innerText = bitrate + " Kbps";
-        document.getElementById('resolution').innerText = resolution;
-        // document.getElementById('calculatedBitrate').innerText = Math.round(cur_biterate);
+
+            t_fps=frameRate;
+            t_resolution=resolution;
+            t_bitrate=bitrate;
+            t_bufferLevel=bufferLevel;
+
+            temp_data=t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel+'\n';
+            data.push(temp_data);
+
+
+            document.getElementById('bufferLevel').innerText = bufferLevel + " secs";
+            document.getElementById('framerate').innerText = frameRate + " fps";
+            document.getElementById('reportedBitrate').innerText = bitrate + " Kbps";
+            document.getElementById('resolution').innerText = resolution;
+            // document.getElementById('calculatedBitrate').innerText = Math.round(cur_biterate);
+        }
+    }, LOG_INTERVAL_MS);
+
+    if (video.webkitVideoDecodedByteCount !== undefined) {
+        var lastDecodedByteCount = 0;
+        const bitrateInterval = 5;
+        var bitrateCalculator = setInterval(function () {
+            var calculatedBitrate = (((video.webkitVideoDecodedByteCount - lastDecodedByteCount) / 1000) * 8) / bitrateInterval;
+            document.getElementById('calculatedBitrate').innerText = Math.round(calculatedBitrate) + " Kbps";
+            lastDecodedByteCount = video.webkitVideoDecodedByteCount;
+        }, bitrateInterval * 1000);
+    } else {
+        document.getElementById('chrome-only').style.display = "none";
     }
-}, 1000);
 
-if (video.webkitVideoDecodedByteCount !== undefined) {
-    var lastDecodedByteCount = 0;
-    const bitrateInterval = 5;
-    var bitrateCalculator = setInterval(function () {
-        var calculatedBitrate = (((video.webkitVideoDecodedByteCount - lastDecodedByteCount) / 1000) * 8) / bitrateInterval;
-        document.getElementById('calculatedBitrate').innerText = Math.round(calculatedBitrate) + " Kbps";
-        lastDecodedByteCount = video.webkitVideoDecodedByteCount;
-    }, bitrateInterval * 1000);
-} else {
-    document.getElementById('chrome-only').style.display = "none";
-}
-
-    };
+};
