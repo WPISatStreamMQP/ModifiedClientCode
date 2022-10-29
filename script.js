@@ -7,6 +7,10 @@ var t_bitrate='40000';
 var t_bufferLevel='10';
 var saveBtn=document.getElementById("save_btn");
 
+var stallData = [];
+var stallStartTime = null
+var stallLength = null
+
 function saveDate(filename, text){
     var pom = document.createElement('a');
     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
@@ -19,6 +23,33 @@ function saveDate(filename, text){
         pom.click();
     }
 }
+
+function onStalled() {
+    stallStartTime = new Date();
+};
+
+function onStarted() {
+    if (stallStartTime == null) {
+        return; } // No stall was started. This might be the first time the stream started. Just ignore.
+
+    var stallStopTime = new Date();
+
+    // Date.getTime converts the datetime to a number of milliseconds since the epoch.
+    var timeElapsedMs = stallStopTime.getTime() - stallStartTime.getTime();
+    var logMsg = "STALL: " + timeElapsedMs + " ms";
+    stallData.push(logMsg);
+
+    var fileName = "Stalls.log";
+    var stallDatasStr = stallData.join("\n").toString();
+    // In the same way the performance data is logged, each time a new entry is added we "download" a new file with the updated full list of stalls.
+    saveDate(fileName, stallDatasStr);
+
+    stallStartTime = null;
+};
+
+function onQualityChanged() {
+
+};
 
 saveBtn.onclick=function(){
 	var t_data=data.join('')
@@ -36,18 +67,19 @@ var timer=setTimeout(function(){
 function display(){
     var datetime = new Date();
     console.log(datetime)
-    var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
+    //var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
     //var url = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
-    //var url = "http://localhost/manifest.mpd?t="+datetime; // localhost server
+    //var url = "http://mlcneta.cs.wpi.edu/manifest_20000ms.mpd?t="+datetime; // MLCNetA server
+    var url = "http://localhost/manifest_20000ms.mpd?t="+datetime; // localhost server
     var player = dashjs.MediaPlayer().create();
     player.updateSettings({
         streaming: {
         buffer:{
-            bufferToKeep: 20,
-            stableBufferTime: 20,
-            bufferTimeAtTopQuality: 40,
-            fastSwitchEnabled: true,
-            initialBufferLevel: NaN
+            bufferToKeep: 20, // Default
+            stableBufferTime: 20, // Default: 12
+            bufferTimeAtTopQuality: 40, // Default: 30
+            fastSwitchEnabled: true, //  Default
+            initialBufferLevel: NaN // Default
         }
         }
     });
