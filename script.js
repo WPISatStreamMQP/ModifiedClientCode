@@ -10,7 +10,7 @@ var saveBtn=document.getElementById("save_btn");
 
 var absPlaybackStartTime = null;
 
-function saveDate(filename, text){
+function saveData(filename, text){
     var pom = document.createElement('a');
     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
     pom.setAttribute('download', filename);
@@ -76,23 +76,19 @@ function onQualityChanged(dashPlayer) {
 saveBtn.onclick=function(){
 	var t_data=data.join('\n')
     var dataString=t_data.toString();
-    saveDate("Tester_",dataString);
+    saveData("Tester_",dataString);
     // saveBtn.style.display="none";
-    //startBtn.style.display="block";s
+    //startBtn.style.display="block";
 }
-
-var timer=setInterval(function(){
-	saveBtn.click();
-}, SAVE_LOG_INTERVAL_MS)
 
 <!--setup the video element and attach it to the Dash player-->
 function display(){
     var datetime = new Date();
     console.log(datetime)
-    //var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
+    var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
     //var url = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
     //var url = "http://mlcneta.cs.wpi.edu/manifest_20000ms.mpd?t="+datetime; // MLCNetA server
-    var url = "http://localhost/manifest_20000ms.mpd?t="+datetime; // localhost server
+    //var url = "http://localhost/manifest_20000ms.mpd?t="+datetime; // localhost server
     var player = dashjs.MediaPlayer().create();
     player.updateSettings({
         streaming: {
@@ -117,6 +113,10 @@ function display(){
     player.on(dashjs.MediaPlayer.events["PLAYBACK_ENDED"], function () {
         clearInterval(eventPoller);
         clearInterval(bitrateCalculator);
+        // Log the last set of data.
+        recordStreamMetrics(player);
+        // Now save the metric data to disk.
+        saveBtn.click();
     });
     player.on(dashjs.MediaPlayer.events["BUFFER_EMPTY"], onStalled);
     player.on(dashjs.MediaPlayer.events["BUFFER_LOADED"], onStarted);
@@ -124,47 +124,7 @@ function display(){
         onQualityChanged(player)
     });
 
-    var eventPoller = setInterval(function () {
-        var streamInfo = player.getActiveStream().getStreamInfo();
-        var dashMetrics = player.getDashMetrics();
-        var dashAdapter = player.getDashAdapter();
-
-        if (dashMetrics && streamInfo) {
-            const periodIdx = streamInfo.index;
-            var repSwitch = dashMetrics.getCurrentRepresentationSwitch('video', true);
-            var bufferLevel = dashMetrics.getCurrentBufferLevel('video', true);
-            var bitrate = repSwitch ? Math.round(dashAdapter.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
-            var adaptation = dashAdapter.getAdaptationForType(periodIdx, 'video', streamInfo);
-            var currentRep = adaptation.Representation_asArray.find(function (rep) {
-                return rep.id === repSwitch.to
-            })
-            var frameRate = currentRep.frameRate;
-            var resolution = currentRep.width + 'x' + currentRep.height;
-            var cur_biterate = player.getAverageThroughput('video', true);
-
-            var t_time=document.getElementById('video').currentTime;
-
-            t_fps=frameRate;
-            t_resolution=resolution;
-            t_bitrate=bitrate;
-            t_bufferLevel=bufferLevel;
-
-            var nowTime = new Date();
-            // Date.getTime() returns milliseconds, so divide by 1000 to convert to seconds.
-            //var absTimeElapsedSec = (nowTime.getTime() - absPlaybackStartTime.getTime()) / 1000;
-            var absTimeElapsedSec = getTimeElapsedSec(absPlaybackStartTime, nowTime);
-
-            temp_data="LOG  "+absTimeElapsedSec+","+t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel;
-            data.push(temp_data);
-
-
-            document.getElementById('bufferLevel').innerText = bufferLevel + " secs";
-            document.getElementById('framerate').innerText = frameRate + " fps";
-            document.getElementById('reportedBitrate').innerText = bitrate + " Kbps";
-            document.getElementById('resolution').innerText = resolution;
-            // document.getElementById('calculatedBitrate').innerText = Math.round(cur_biterate);
-        }
-    }, LOG_INTERVAL_MS);
+    var eventPoller = setInterval(() => recordStreamMetrics(player), LOG_INTERVAL_MS);
 
     if (video.webkitVideoDecodedByteCount !== undefined) {
         var lastDecodedByteCount = 0;
@@ -178,4 +138,45 @@ function display(){
         document.getElementById('chrome-only').style.display = "none";
     }
 
+};
+
+function recordStreamMetrics(player) {
+    var streamInfo = player.getActiveStream().getStreamInfo();
+    var dashMetrics = player.getDashMetrics();
+    var dashAdapter = player.getDashAdapter();
+
+    if (dashMetrics && streamInfo) {
+        const periodIdx = streamInfo.index;
+        var repSwitch = dashMetrics.getCurrentRepresentationSwitch('video', true);
+        var bufferLevel = dashMetrics.getCurrentBufferLevel('video', true);
+        var bitrate = repSwitch ? Math.round(dashAdapter.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
+        var adaptation = dashAdapter.getAdaptationForType(periodIdx, 'video', streamInfo);
+        var currentRep = adaptation.Representation_asArray.find(function (rep) {
+            return rep.id === repSwitch.to
+        })
+        var frameRate = currentRep.frameRate;
+        var resolution = currentRep.width + 'x' + currentRep.height;
+        var cur_biterate = player.getAverageThroughput('video', true);
+
+        var t_time=document.getElementById('video').currentTime;
+
+        t_fps=frameRate;
+        t_resolution=resolution;
+        t_bitrate=bitrate;
+        t_bufferLevel=bufferLevel;
+
+        var nowTime = new Date();
+        // Date.getTime() returns milliseconds, so divide by 1000 to convert to seconds.
+        var absTimeElapsedSec = getTimeElapsedSec(absPlaybackStartTime, nowTime);
+
+        temp_data="LOG  "+absTimeElapsedSec+","+t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel;
+        data.push(temp_data);
+
+
+        document.getElementById('bufferLevel').innerText = bufferLevel + " secs";
+        document.getElementById('framerate').innerText = frameRate + " fps";
+        document.getElementById('reportedBitrate').innerText = bitrate + " Kbps";
+        document.getElementById('resolution').innerText = resolution;
+        // document.getElementById('calculatedBitrate').innerText = Math.round(cur_biterate);
+    }
 };
