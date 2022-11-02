@@ -1,4 +1,5 @@
-var LOG_INTERVAL_MS = 1000
+var SAVE_LOG_INTERVAL_MS = 180000
+var LOG_INTERVAL_MS = 500
 
 var data=[];
 var t_fps='60';
@@ -7,9 +8,7 @@ var t_bitrate='40000';
 var t_bufferLevel='10';
 var saveBtn=document.getElementById("save_btn");
 
-var stallData = [];
-var stallStartTime = null
-var stallLength = null
+var absPlaybackStartTime = null;
 
 function saveDate(filename, text){
     var pom = document.createElement('a');
@@ -24,6 +23,13 @@ function saveDate(filename, text){
     }
 }
 
+function getTimeElapsedSec(startTime, endTime) {
+    var curTime = new Date();
+    // Date.getTime converts the datetime to a number of milliseconds since the epoch. Divide by 1000 to convert to seconds.
+    var absTimeElapsedSec = (endTime.getTime() - startTime.getTime()) / 1000;
+    return absTimeElapsedSec;
+}
+
 function onStalled() {
     stallStartTime = new Date();
 };
@@ -34,34 +40,50 @@ function onStarted() {
 
     var stallStopTime = new Date();
 
-    // Date.getTime converts the datetime to a number of milliseconds since the epoch.
-    var timeElapsedMs = stallStopTime.getTime() - stallStartTime.getTime();
-    var logMsg = "STALL: " + timeElapsedMs + " ms";
-    stallData.push(logMsg);
+    var timeElapsedMs = getTimeElapsedSec(stallStartTime, stallStopTime) * 1000;
 
-    var fileName = "Stalls.log";
-    var stallDatasStr = stallData.join("\n").toString();
-    // In the same way the performance data is logged, each time a new entry is added we "download" a new file with the updated full list of stalls.
-    saveDate(fileName, stallDatasStr);
+    var logMsg = "STALL  " + timeElapsedMs + " ms";
+    data.push(logMsg);
 
     stallStartTime = null;
 };
 
-function onQualityChanged() {
+function onQualityChanged(dashPlayer) {
+    var dashAdapter = dashPlayer.getDashAdapter();
+    var streamInfo = dashPlayer.getActiveStream().getStreamInfo();
+    const periodIdx = streamInfo.index;
+    var dashMetrics = dashPlayer.getDashMetrics();
+    var repSwitch = dashMetrics.getCurrentRepresentationSwitch('video', true);
+    var adaptation = dashAdapter.getAdaptationForType(periodIdx, 'video', streamInfo);
+    var currentRep = adaptation.Representation_asArray.find(function (rep) {
+        return rep.id === repSwitch.to
+    });
+    var resolution = currentRep.width + 'x' + currentRep.height;
+    
+    var nowTime = new Date();
+    var timeElapsedSec;
+    if (absPlaybackStartTime == null) {
+        // Playback didn't start yet!
+        timeElapsedSec = 0;
+    } else {
+        timeElapsedSec = getTimeElapsedSec(absPlaybackStartTime, nowTime);
+    }
 
+    var logMsg = "QUAL  at " + timeElapsedSec + " to " + resolution;
+    data.push(logMsg);
 };
 
 saveBtn.onclick=function(){
-	var t_data=data.join('')
+	var t_data=data.join('\n')
     var dataString=t_data.toString();
     saveDate("Tester_",dataString);
     // saveBtn.style.display="none";
     //startBtn.style.display="block";s
 }
 
-var timer=setTimeout(function(){
+var timer=setInterval(function(){
 	saveBtn.click();
-},10000)
+}, SAVE_LOG_INTERVAL_MS)
 
 <!--setup the video element and attach it to the Dash player-->
 function display(){
@@ -85,13 +107,22 @@ function display(){
     });
     
     player.initialize(document.querySelector("#video"), url, true);
+    player.on(dashjs.MediaPlayer.events["PLAYBACK_STARTED"], function () {
+        // Store a variable of when the playback started, as long as one hasn't been started before.
+        // NOTE: This will not factor in if the user paused and then played the stream again. Considering they could seek around to other parts of the video, I'm ignoring the complexities of this and am just starting the timer once at the beginning.
+        if (absPlaybackStartTime == null) {
+            absPlaybackStartTime = new Date();
+        }
+    });
     player.on(dashjs.MediaPlayer.events["PLAYBACK_ENDED"], function () {
         clearInterval(eventPoller);
         clearInterval(bitrateCalculator);
     });
     player.on(dashjs.MediaPlayer.events["BUFFER_EMPTY"], onStalled);
     player.on(dashjs.MediaPlayer.events["BUFFER_LOADED"], onStarted);
-    player.on(dashjs.MediaPlayer.events["QUALITY_CHANGE_REQUESTED"], onQualityChanged);
+    player.on(dashjs.MediaPlayer.events["QUALITY_CHANGE_REQUESTED"], function() {
+        onQualityChanged(player)
+    });
 
     var eventPoller = setInterval(function () {
         var streamInfo = player.getActiveStream().getStreamInfo();
@@ -113,14 +144,17 @@ function display(){
 
             var t_time=document.getElementById('video').currentTime;
 
-
-
             t_fps=frameRate;
             t_resolution=resolution;
             t_bitrate=bitrate;
             t_bufferLevel=bufferLevel;
 
-            temp_data=t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel+'\n';
+            var nowTime = new Date();
+            // Date.getTime() returns milliseconds, so divide by 1000 to convert to seconds.
+            //var absTimeElapsedSec = (nowTime.getTime() - absPlaybackStartTime.getTime()) / 1000;
+            var absTimeElapsedSec = getTimeElapsedSec(absPlaybackStartTime, nowTime);
+
+            temp_data="LOG  "+absTimeElapsedSec+","+t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel;
             data.push(temp_data);
 
 
