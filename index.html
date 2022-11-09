@@ -7,26 +7,32 @@
         width: 60%;
         height: 60%;
         }
+
+        #urlInput {
+            width: 50%;
+        }
     </style>
 </head>
 <body>
     <div>
         <h1>Adaptive Streaming with HTML5</h1>
+        <div><button id="urlConfirmButton">Load</button><input id="urlInput" type="text" placeholder="manifest.mpd URL"/></div>
         <video autoplay id="video" controls></video>
         <p>Reported bitrate: <span id='reportedBitrate'></span></p>
         <p>Framerate: <span id='framerate'></span></p>
         <p>Buffer level: <span id='bufferLevel'></span></p>
         <p>Resolution: <span id='resolution'></span></p>
         <button type="button" id="save_btn">Save Data</button>
+        <h2 id="streamDoneLabel" style="display:none;">Stream done!</h2>
 <!--         <p>Average Throughput: <span id='calculatedBitrate'></span></p> -->
 
-    <div>
+    </div>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>    
     <!-- DASH-AVC/265 reference implementation -->
     <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
     <script src = "script.js"></script>
-    <script>
+    <!-- <script>
         display()
-    </script>
+    </script> -->
 </body>
 </html>
