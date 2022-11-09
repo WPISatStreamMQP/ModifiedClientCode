@@ -111,7 +111,6 @@ function getManifestUrl() {
     return url.toString();
 }
 
-<!--setup the video element and attach it to the Dash player-->
 function display(){
     var datetime = new Date();
     console.log(datetime)
