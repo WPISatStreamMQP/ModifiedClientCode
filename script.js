@@ -7,6 +7,7 @@ var t_resolution='1920X1080';
 var t_bitrate='40000';
 var t_bufferLevel='10';
 var saveBtn=document.getElementById("save_btn");
+var loadBtn = document.getElementById("urlConfirmButton");
 
 var absPlaybackStartTime = null;
 
@@ -42,6 +43,7 @@ function onStarted() {
 
     var timeElapsedMs = getTimeElapsedSec(stallStartTime, stallStopTime) * 1000;
 
+    // Log the time that the stall started.
     var logMsg = "STALL  " + timeElapsedMs + " ms";
     data.push(logMsg);
 
@@ -81,11 +83,40 @@ saveBtn.onclick=function(){
     //startBtn.style.display="block";
 }
 
+loadBtn.onclick = function() {
+    display();
+}
+
+/*var timer=setInterval(function(){
+	//saveBtn.click();
+
+    var doneLabel = document.getElementById("streamDoneLabel");
+    doneLabel.style.display = "block";
+}, SAVE_LOG_INTERVAL_MS)*/
+
+function getManifestUrl() {
+    var urlInput = document.getElementById("urlInput");
+    if (!urlInput) {
+        // The URL input field doesn't exist. Panic.
+        console.log("Could not load URL from urlInput text input field. Loading default.");
+        throw new Error("Could not find urlInput field to load the URL from!");
+        //return "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
+        //return "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
+        //return "http://mlcneta.cs.wpi.edu/manifest_20000ms.mpd?t="+datetime; // MLCNetA server
+        //return "http://localhost/manifest_20000ms.mpd?t="+datetime; // localhost server
+    }
+    var url = new URL(urlInput.value);
+    var datetime = new Date();
+    url.searchParams.set("t", datetime)
+    return url.toString();
+}
+
 <!--setup the video element and attach it to the Dash player-->
 function display(){
     var datetime = new Date();
     console.log(datetime)
-    var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
+    var url = getManifestUrl();
+    //var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
     //var url = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
     //var url = "http://mlcneta.cs.wpi.edu/manifest_20000ms.mpd?t="+datetime; // MLCNetA server
     //var url = "http://localhost/manifest_20000ms.mpd?t="+datetime; // localhost server
@@ -113,10 +144,13 @@ function display(){
     player.on(dashjs.MediaPlayer.events["PLAYBACK_ENDED"], function () {
         clearInterval(eventPoller);
         clearInterval(bitrateCalculator);
+        //clearInterval(timer);
         // Log the last set of data.
         recordStreamMetrics(player);
         // Now save the metric data to disk.
         saveBtn.click();
+        var doneLabel = document.getElementById("streamDoneLabel");
+        doneLabel.style.display = "block";
     });
     player.on(dashjs.MediaPlayer.events["BUFFER_EMPTY"], onStalled);
     player.on(dashjs.MediaPlayer.events["BUFFER_LOADED"], onStarted);
