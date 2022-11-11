@@ -18,9 +18,9 @@ var loadBtn = document.getElementById("urlConfirmButton");
 var absVideoLoadStartTime = null;
 var absPlaybackStartTime = null;
 var videoUrl = null;
+var outputFileName = null;
 
-function saveData(filename, text){
-    var encodedFileName = encodeURIComponent(filename);
+function saveData(encodedFileName, text){
     console.log("Saving data to " + encodedFileName);
     var pom = document.createElement('a');
     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
@@ -91,16 +91,25 @@ saveBtn.onclick=function(){
     // Removes the scheme identifier (eg "https://") from the front of the URL so the result is file-system compatible.
     var videoUrlAfterProtocol = videoUrl.replace(URL_SCHEME_REGEX, "");
     // Removes the query parameters from the end of the URL so the whole timestamp doesn't spam the file name.
-    var videoUrlCleaned = videoUrlAfterProtocol.replace(URL_QUERY_PARAMS_REGEX, "");
-    console.log("URL AFTER:" + videoUrlCleaned);
-    var outputFileName = "Tester_" + videoUrlCleaned;
-    saveData(outputFileName,dataString);
+    var videoUrlCleaned = encodeURIComponent(videoUrlAfterProtocol.replace(URL_QUERY_PARAMS_REGEX, ""));
+    console.log("URL AFTER: " + videoUrlCleaned);
+    outputFileName = "Tester_" + videoUrlCleaned;
+    saveData(outputFileName, dataString);
+    displayDoneLabel();
     // saveBtn.style.display="none";
     //startBtn.style.display="block";
 }
 
 loadBtn.onclick = function() {
     display();
+}
+
+function displayDoneLabel() {
+    var doneLabel = document.getElementById("streamDoneLabel");
+    if (outputFileName !== null && outputFileName.trim() !== "") {
+        doneLabel.textContent = outputFileName;
+    }
+    doneLabel.style.display = "block";
 }
 
 /*var timer=setInterval(function(){
@@ -169,8 +178,6 @@ function display(){
         recordStreamMetrics(player);
         // Now save the metric data to disk.
         saveBtn.click();
-        var doneLabel = document.getElementById("streamDoneLabel");
-        doneLabel.style.display = "block";
     });
     player.on(dashjs.MediaPlayer.events["BUFFER_EMPTY"], onStalled);
     player.on(dashjs.MediaPlayer.events["BUFFER_LOADED"], onStarted);
