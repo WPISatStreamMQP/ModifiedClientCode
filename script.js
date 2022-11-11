@@ -9,6 +9,7 @@ var t_bufferLevel='10';
 var saveBtn=document.getElementById("save_btn");
 var loadBtn = document.getElementById("urlConfirmButton");
 
+var absVideoLoadStartTime = null;
 var absPlaybackStartTime = null;
 
 function saveData(filename, text){
@@ -114,6 +115,7 @@ function getManifestUrl() {
 function display(){
     var datetime = new Date();
     console.log(datetime)
+    absVideoLoadStartTime = datetime;
     var url = getManifestUrl();
     //var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
     //var url = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
@@ -138,6 +140,10 @@ function display(){
         // NOTE: This will not factor in if the user paused and then played the stream again. Considering they could seek around to other parts of the video, I'm ignoring the complexities of this and am just starting the timer once at the beginning.
         if (absPlaybackStartTime == null) {
             absPlaybackStartTime = new Date();
+            // Get the time between when the video first started to load and now, when it started playing.
+            var timeElapsedSec = getTimeElapsedSec(absVideoLoadStartTime, absPlaybackStartTime);
+            var logMsg = "START  took " + timeElapsedSec * 1000 + " ms";
+            data.push(logMsg);
         }
     });
     player.on(dashjs.MediaPlayer.events["PLAYBACK_ENDED"], function () {

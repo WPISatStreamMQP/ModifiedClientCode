@@ -15,6 +15,8 @@ STREAM_DONE_LABEL_ID = "streamDoneLabel"
 SAVE_BUTTON_ID = "save_btn"
 
 def main():
+    # TODO: Log any settings at the beginning of running this script. EG the timeout setting, the URL, etc.
+
     if (len(sys.argv) < 2):
         print("No URL argument received")
     url = sys.argv[1] # URL should be the first element in the input.
@@ -22,7 +24,7 @@ def main():
 
     options = Options()
     print("Options created")
-    options.add_argument("-headless")
+    #options.add_argument("-headless")
     #options.add_argument("-P")
     #options.add_argument("headlessTester")
     print("Options set. Launching browser")
@@ -56,6 +58,8 @@ def main():
         # Since the stream failed to finish, it has not saved the log. Do that for it.
         web_saveButton = ffDriver.find_element(By.ID, SAVE_BUTTON_ID)
         web_saveButton.click()
+
+    # TODO: Create directory with date, time, and host running it. Copy data, Wireshark, etc files to there.
 
     ffDriver.quit()
 
