@@ -1,6 +1,12 @@
 var SAVE_LOG_INTERVAL_MS = 180000
 var LOG_INTERVAL_MS = 500
 
+// Meant to match the scheme portion of a URL (eg "https://"). Based on comments in https://stackoverflow.com/a/8206299.
+// Using a regex for a situation with as much variation as this is horrible but I couldn't find a simple alternative.
+var URL_SCHEME_REGEX = /^\/\/|^.*?:(?:\/\/)?/;
+// Matches all the content of the query parameters in the URL plus the ? at the start.
+var URL_QUERY_PARAMS_REGEX = /\?(?:.)*$/;
+
 var data=[];
 var t_fps='60';
 var t_resolution='1920X1080';
@@ -11,11 +17,14 @@ var loadBtn = document.getElementById("urlConfirmButton");
 
 var absVideoLoadStartTime = null;
 var absPlaybackStartTime = null;
+var videoUrl = null;
 
 function saveData(filename, text){
+    var encodedFileName = encodeURIComponent(filename);
+    console.log("Saving data to " + encodedFileName);
     var pom = document.createElement('a');
     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-    pom.setAttribute('download', filename);
+    pom.setAttribute('download', encodedFileName);
     if (document.createEvent) {
         var event = document.createEvent('MouseEvents');
         event.initEvent('click', true, true);
@@ -79,7 +88,13 @@ function onQualityChanged(dashPlayer) {
 saveBtn.onclick=function(){
 	var t_data=data.join('\n')
     var dataString=t_data.toString();
-    saveData("Tester_",dataString);
+    // Removes the scheme identifier (eg "https://") from the front of the URL so the result is file-system compatible.
+    var videoUrlAfterProtocol = videoUrl.replace(URL_SCHEME_REGEX, "");
+    // Removes the query parameters from the end of the URL so the whole timestamp doesn't spam the file name.
+    var videoUrlCleaned = videoUrlAfterProtocol.replace(URL_QUERY_PARAMS_REGEX, "");
+    console.log("URL AFTER:" + videoUrlCleaned);
+    var outputFileName = "Tester_" + videoUrlCleaned;
+    saveData(outputFileName,dataString);
     // saveBtn.style.display="none";
     //startBtn.style.display="block";
 }
@@ -116,11 +131,11 @@ function display(){
     var datetime = new Date();
     console.log(datetime)
     absVideoLoadStartTime = datetime;
-    var url = getManifestUrl();
-    //var url = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
-    //var url = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
-    //var url = "http://mlcneta.cs.wpi.edu/manifest_20000ms.mpd?t="+datetime; // MLCNetA server
-    //var url = "http://localhost/manifest_20000ms.mpd?t="+datetime; // localhost server
+    videoUrl = getManifestUrl();
+    //videoUrl = "http://192.168.8.14/manifest_20000ms.mpd?t="+datetime; // Home Dell server
+    //videoUrl = "http://130.215.30.14/manifest.mpd?t="+datetime; // Xiaokun's server
+    //videoUrl = "http://mlcneta.cs.wpi.edu/manifest_20000ms.mpd?t="+datetime; // MLCNetA server
+    //videoUrl = "http://localhost/manifest_20000ms.mpd?t="+datetime; // localhost server
     var player = dashjs.MediaPlayer().create();
     player.updateSettings({
         streaming: {
@@ -134,7 +149,7 @@ function display(){
         }
     });
     
-    player.initialize(document.querySelector("#video"), url, true);
+    player.initialize(document.querySelector("#video"), videoUrl, true);
     player.on(dashjs.MediaPlayer.events["PLAYBACK_STARTED"], function () {
         // Store a variable of when the playback started, as long as one hasn't been started before.
         // NOTE: This will not factor in if the user paused and then played the stream again. Considering they could seek around to other parts of the video, I'm ignoring the complexities of this and am just starting the timer once at the beginning.
