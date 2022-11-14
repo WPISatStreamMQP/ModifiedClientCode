@@ -66,7 +66,7 @@ def main():
     workingDirectory = os.getcwd()
     now_iso = datetime.datetime.now().isoformat().replace(":", "_") # Replace colons with underscores because Windows is evil.
     myHostname = socket.gethostname()
-    resultsDirName = now_iso + "_" + myHostname
+    resultsDirName = "Results_" + now_iso + "_" + myHostname
     resultsDirPath = os.path.join(workingDirectory, resultsDirName)
     os.mkdir(resultsDirPath)
     print("Results will be saved in directory " + resultsDirPath)
