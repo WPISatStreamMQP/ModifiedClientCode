@@ -14,11 +14,13 @@ class NonPromLiveCapture(LiveCapture):
         return params
 
 def main():
+    # TODO: Re-enable promiscuous mode.
     capture = NonPromLiveCapture(interface = INTERFACE)
     print("Sniffing")
     capture.sniff(packet_count = 50)
     print(capture)
     ct = 0
+    # TODO: We only need the header of the packet. Tell Pyshark to only collect that (SNAP length). Might be a custom parameter added to the Pyshark setup similar to disabling promisc. Will keep the data smaller.
     for packet in capture:
         #print(dir(packet))
 
