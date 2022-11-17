@@ -93,7 +93,7 @@ saveBtn.onclick=function(){
     // Removes the query parameters from the end of the URL so the whole timestamp doesn't spam the file name.
     var videoUrlCleaned = encodeURIComponent(videoUrlAfterProtocol.replace(URL_QUERY_PARAMS_REGEX, ""));
     console.log("URL AFTER: " + videoUrlCleaned);
-    outputFileName = "Tester_" + videoUrlCleaned;
+    outputFileName = "Tester_" + videoUrlCleaned + ".log";
     saveData(outputFileName, dataString);
     displayDoneLabel();
     // saveBtn.style.display="none";

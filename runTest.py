@@ -4,10 +4,20 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from pyshark import LiveCapture
+from threading import Thread
 import os
 import sys
 import datetime
 import socket
+import pyshark
+import asyncio
+import csv
+
+ETH_HDR_LEN_B = 14
+IP_HDR_LEN_B = 20
+TCP_HDR_LEN_B = 20
+TOTAL_HDR_LEN_B = ETH_HDR_LEN_B + IP_HDR_LEN_B + TCP_HDR_LEN_B
 
 STREAM_TIMEOUT_SEC = 900 # Timeout streams after 15 minutes and assume it encountered errors.
 GENERIC_TIMEOUT_SEC = 3 # When accessing a regular element, timeout after just three seconds.
@@ -17,13 +27,51 @@ URL_CONFIRM_BUTTON_ID = "urlConfirmButton"
 STREAM_DONE_LABEL_ID = "streamDoneLabel"
 SAVE_BUTTON_ID = "save_btn"
 
-def main():
+PACKET_PCAP_FILENAME = "packets.pcap"
+PACKET_CSV_FILENAME = "packets.csv"
+
+class NonPromLiveCapture(LiveCapture):
+    def get_parameters(self, packet_count=None):
+        params = super(LiveCapture, self).get_parameters(packet_count = packet_count)
+        for interface in self.interfaces:
+            params += ["-i", interface]
+        if self.bpf_filter:
+            params += ["-f", self.bpf_filter]
+        params += ["-p"] # Disable promiscuous mode.
+        
+        # Set Snap Length to the length of the header. This'll make it ignore the data of the packet.
+        # NOTE: This is assuming the IP and TCP headers have no options. If the TCP packet has options, they will simply be cut off. If the IP header has options, part of the TCP header will be cut off (since it comes after). I don't know how to deal with this.
+        # TODO: We could assume the maximum size of each header and cut based on that? Worst case scenario then, a few bytes of the data gets included.
+        params += ["-s", str(TOTAL_HDR_LEN_B)]
+        return params
+
+# NOTE: This flag is used to tell the packet sniffing thread when to stop. Make sure to set it to False at some point or the capture will never stop!
+shouldContinueSniffing = True
+
+class Packet:
+    def __init__(self, frame_time, frame_length):
+        self.frame_time = str(frame_time)
+        self.frame_length = str(frame_length)
+    def __iter__(self):
+        return iter([self.frame_time, self.frame_length])
+packets = []
+
+def main(netInterface):
+    global packets, shouldContinueSniffing
     # TODO: Log any settings at the beginning of running this script. EG the timeout setting, the URL, etc.
 
     if (len(sys.argv) < 2):
         print("No URL argument received")
     url = sys.argv[1] # URL should be the first element in the input.
     print("Received URL: " + url)
+
+    # Start the packet capture.
+    # NOTE: I do this before anything else because after calling Thread.start(), it takes some time for the sniffing to actually get going. If I do it later, it's possible for it to miss part of the relevant data. It does include some extra stuff since it's so early, but it's necessary.
+    shouldContinueSniffing = True
+    eventLoop = asyncio.get_event_loop()
+    sniffThread = Thread(target = capturePackets, args = [netInterface, eventLoop])
+    print("Starting Wireshark sniffer.")
+    sniffThread.start()
 
     options = Options()
     print("Options created")
@@ -35,7 +83,7 @@ def main():
     print("Browser launched")
 
     pathToIndex = os.path.join(os.getcwd(), "index.html")
-    
+
     print("Navigating browser to " + pathToIndex)
     ffDriver.get(pathToIndex)
 
@@ -61,6 +109,12 @@ def main():
         # Since the stream failed to finish, it has not saved the log. Do that for it.
         web_saveButton = ffDriver.find_element(By.ID, SAVE_BUTTON_ID)
         web_saveButton.click()
+    
+    print("Stopping packet sniffer")
+    shouldContinueSniffing = False
+    sniffThread.join()
+    print("Packet sniffer stopped")
+    print(str(len(packets)) + " packets captured")
 
     # Make a directory for this run of the test.
     workingDirectory = os.getcwd()
@@ -82,14 +136,50 @@ def main():
     else:
         mostRecentFilePath = os.path.join(downloadsPath, mostRecentFileName)
 
-        # Move the data files to the new directory.
+        # Move the data files to the results directory.
         movedLogFilePath = os.path.join(resultsDirPath, mostRecentFileName)
         os.rename(mostRecentFilePath, movedLogFilePath)
         print("JavaScript log data moved to " + movedLogFilePath)
 
+    # Output packet capture data to the results directory.
+    print("Outputting Wireshark captured packets")
+    packetPcapFileName = PACKET_PCAP_FILENAME
+    packetPcapFilePath = os.path.join(workingDirectory, packetPcapFileName)
+    newPacketPcapFilePath = os.path.join(resultsDirPath, packetPcapFileName)
+    print("Moving packet PCAP file to " + newPacketPcapFilePath)
+    os.rename(packetPcapFilePath, newPacketPcapFilePath)
+    packetCsvFileName = PACKET_CSV_FILENAME
+    packetCsvFilePath = os.path.join(resultsDirPath, packetCsvFileName)
+    print("Outputting packet CSV at " + packetCsvFilePath)
+    outputPackets(packetCsvFilePath, packets)
+
     print("Exiting browser")
     ffDriver.quit()
     print("Test completed. Exiting")
+
+def capturePackets(netInterface, eventLoop):
+    global shouldContinueSniffing, packets
+    asyncio.set_event_loop(eventLoop)
+    capture = NonPromLiveCapture(interface = netInterface, output_file = PACKET_PCAP_FILENAME)
+    for packet in capture.sniff_continuously():
+        if not shouldContinueSniffing:
+            break
+
+        frame_time_rel = packet.frame_info.time_relative
+        frame_length = packet.frame_info.len
+
+        packets.append(Packet(frame_time_rel, frame_length))
+    #capture.load_packets()
+
+def outputPackets(fileName, packets):
+    with open(fileName, "w", newline = "") as csv_file:
+        csvWriter = csv.writer(csv_file, delimiter = ",")
+        isHeaderPrinted = False
+        for packet in packets:
+            if not isHeaderPrinted:
+                csvWriter.writerow(vars(packet))
+                isHeaderPrinted = True
+            csvWriter.writerow(list(packet))
 
 def getLatestFileContainsNamePath(dirPath, name):
     #files = sorted((f for f in os.listdir(dirPath) if f.find(name) != -1), 
@@ -103,4 +193,4 @@ def getLatestFileContainsNamePath(dirPath, name):
     return mostRecent
 
 if __name__ == "__main__":
-    main()
+    main(netInterface = "Wi-Fi")
