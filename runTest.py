@@ -32,7 +32,10 @@ SAVE_BUTTON_ID = "save_btn"
 PACKET_PCAP_FILENAME = "packets.pcap"
 PACKET_CSV_FILENAME = "packets.csv"
 
-TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields -e _ws.col.Time -e frame.len -e ip.src -e ip.dst -E header=y -E separator=, > {csvName}"
+TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields"\
+                            "-e _ws.col.Time -e frame.len -e ip.src -e ip.dst"\
+                            "-E header=y -E separator=,"\
+                            "> {csvName}"
 
 class NonPromLiveCapture(LiveCapture):
     def get_parameters(self, packet_count=None):
@@ -51,7 +54,7 @@ class NonPromLiveCapture(LiveCapture):
 shouldContinueSniffing = True
 
 def main(netInterface):
-    global packets, shouldContinueSniffing
+    global shouldContinueSniffing
     # TODO: Log any settings at the beginning of running this script. EG the timeout setting, the URL, etc.
 
     if (len(sys.argv) < 2):
