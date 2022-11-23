@@ -15,9 +15,10 @@ import asyncio
 import csv
 
 ETH_HDR_LEN_B = 14
-IP_HDR_LEN_B = 20
-TCP_HDR_LEN_B = 20
-TOTAL_HDR_LEN_B = ETH_HDR_LEN_B + IP_HDR_LEN_B + TCP_HDR_LEN_B
+IP_HDR_LEN_MAX_B = 60
+# The UDP max header length is 8 bytes, and the QUIC max header length is 20 bytes. So TCP at 60 bytes has the largest possible header.
+TCP_HDR_LEN_MAX_B = 60 # 20 bytes usually, but 60 is the absolute max supported due to the size of the IHL field.
+TOTAL_HDR_LEN_B = ETH_HDR_LEN_B + IP_HDR_LEN_MAX_B + TCP_HDR_LEN_MAX_B
 
 STREAM_TIMEOUT_SEC = 900 # Timeout streams after 15 minutes and assume it encountered errors.
 GENERIC_TIMEOUT_SEC = 3 # When accessing a regular element, timeout after just three seconds.
@@ -38,7 +39,7 @@ class NonPromLiveCapture(LiveCapture):
         if self.bpf_filter:
             params += ["-f", self.bpf_filter]
         params += ["-p"] # Disable promiscuous mode.
-        
+
         # Set Snap Length to the length of the header. This'll make it ignore the data of the packet.
         # NOTE: This is assuming the IP and TCP headers have no options. If the TCP packet has options, they will simply be cut off. If the IP header has options, part of the TCP header will be cut off (since it comes after). I don't know how to deal with this.
         # TODO: We could assume the maximum size of each header and cut based on that? Worst case scenario then, a few bytes of the data gets included.
@@ -49,11 +50,13 @@ class NonPromLiveCapture(LiveCapture):
 shouldContinueSniffing = True
 
 class Packet:
-    def __init__(self, frame_time, frame_length):
+    def __init__(self, frame_time, frame_length, ip_src, ip_dst):
         self.frame_time = str(frame_time)
         self.frame_length = str(frame_length)
+        self.ip_src = str(ip_src)
+        self.ip_dst = str(ip_dst)
     def __iter__(self):
-        return iter([self.frame_time, self.frame_length])
+        return iter([self.frame_time, self.frame_length, self.ip_src, self.ip_dst])
 packets = []
 
 def main(netInterface):
@@ -163,13 +166,17 @@ def capturePackets(netInterface, eventLoop):
     capture = NonPromLiveCapture(interface = netInterface, output_file = PACKET_PCAP_FILENAME)
     for packet in capture.sniff_continuously():
         if not shouldContinueSniffing:
+            capture.close()
             break
 
         frame_time_rel = packet.frame_info.time_relative
         frame_length = packet.frame_info.len
+        ip_src = packet.ip.src
+        ip_dst = packet.ip.dst
 
-        packets.append(Packet(frame_time_rel, frame_length))
+        packets.append(Packet(frame_time_rel, frame_length, ip_src, ip_dst))
     #capture.load_packets()
+    
 
 def outputPackets(fileName, packets):
     with open(fileName, "w", newline = "") as csv_file:
