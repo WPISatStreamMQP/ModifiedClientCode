@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from pyshark import LiveCapture
+from pyshark import LiveCapture, FileCapture
 from threading import Thread
 import os
 import sys
@@ -13,6 +13,7 @@ import socket
 import pyshark
 import asyncio
 import csv
+import time
 
 ETH_HDR_LEN_B = 14
 IP_HDR_LEN_MAX_B = 60
@@ -31,6 +32,8 @@ SAVE_BUTTON_ID = "save_btn"
 PACKET_PCAP_FILENAME = "packets.pcap"
 PACKET_CSV_FILENAME = "packets.csv"
 
+TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields -e _ws.col.Time -e frame.len -e ip.src -e ip.dst -E header=y -E separator=, > {csvName}"
+
 class NonPromLiveCapture(LiveCapture):
     def get_parameters(self, packet_count=None):
         params = super(LiveCapture, self).get_parameters(packet_count = packet_count)
@@ -41,23 +44,11 @@ class NonPromLiveCapture(LiveCapture):
         params += ["-p"] # Disable promiscuous mode.
 
         # Set Snap Length to the length of the header. This'll make it ignore the data of the packet.
-        # NOTE: This is assuming the IP and TCP headers have no options. If the TCP packet has options, they will simply be cut off. If the IP header has options, part of the TCP header will be cut off (since it comes after). I don't know how to deal with this.
-        # TODO: We could assume the maximum size of each header and cut based on that? Worst case scenario then, a few bytes of the data gets included.
         params += ["-s", str(TOTAL_HDR_LEN_B)]
         return params
 
 # NOTE: This flag is used to tell the packet sniffing thread when to stop. Make sure to set it to False at some point or the capture will never stop!
 shouldContinueSniffing = True
-
-class Packet:
-    def __init__(self, frame_time, frame_length, ip_src, ip_dst):
-        self.frame_time = str(frame_time)
-        self.frame_length = str(frame_length)
-        self.ip_src = str(ip_src)
-        self.ip_dst = str(ip_dst)
-    def __iter__(self):
-        return iter([self.frame_time, self.frame_length, self.ip_src, self.ip_dst])
-packets = []
 
 def main(netInterface):
     global packets, shouldContinueSniffing
@@ -117,7 +108,11 @@ def main(netInterface):
     shouldContinueSniffing = False
     sniffThread.join()
     print("Packet sniffer stopped")
-    print(str(len(packets)) + " packets captured")
+    print("Waiting 5 seconds for live capture to complete.")
+    time.sleep(5)
+
+    print("Processing file output from live capture.")
+    processPackets(PACKET_PCAP_FILENAME)
 
     # Make a directory for this run of the test.
     workingDirectory = os.getcwd()
@@ -152,9 +147,10 @@ def main(netInterface):
     print("Moving packet PCAP file to " + newPacketPcapFilePath)
     os.rename(packetPcapFilePath, newPacketPcapFilePath)
     packetCsvFileName = PACKET_CSV_FILENAME
-    packetCsvFilePath = os.path.join(resultsDirPath, packetCsvFileName)
-    print("Outputting packet CSV at " + packetCsvFilePath)
-    outputPackets(packetCsvFilePath, packets)
+    packetCsvFilePath = os.path.join(workingDirectory, packetCsvFileName)
+    newPacketCsvFilePath = os.path.join(resultsDirPath, packetCsvFileName)
+    print("Moving packet CSV to " + packetCsvFilePath)
+    os.rename(packetCsvFilePath, newPacketCsvFilePath)
 
     print("Exiting browser")
     ffDriver.quit()
@@ -163,20 +159,17 @@ def main(netInterface):
 def capturePackets(netInterface, eventLoop):
     global shouldContinueSniffing, packets
     asyncio.set_event_loop(eventLoop)
-    capture = NonPromLiveCapture(interface = netInterface, output_file = PACKET_PCAP_FILENAME)
-    for packet in capture.sniff_continuously():
+    liveCapture = NonPromLiveCapture(interface = netInterface, output_file = PACKET_PCAP_FILENAME)
+    for _ in liveCapture.sniff_continuously():
         if not shouldContinueSniffing:
-            capture.close()
+            print("Stopping live capture.")
+            liveCapture.close()
             break
 
-        frame_time_rel = packet.frame_info.time_relative
-        frame_length = packet.frame_info.len
-        ip_src = packet.ip.src
-        ip_dst = packet.ip.dst
-
-        packets.append(Packet(frame_time_rel, frame_length, ip_src, ip_dst))
-    #capture.load_packets()
-    
+def processPackets(fileName):
+    # This will return once the tshark command completes. I.e., it will block until processing is done.
+    tsharkCommand = TSHARK_FILEOUTPUT_COMMAND.format(pcapName = PACKET_PCAP_FILENAME, csvName = PACKET_CSV_FILENAME)
+    os.system(tsharkCommand)
 
 def outputPackets(fileName, packets):
     with open(fileName, "w", newline = "") as csv_file:
