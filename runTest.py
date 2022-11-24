@@ -7,6 +7,7 @@ import asyncio
 import csv
 import time
 import dns.resolver
+import shutil
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
@@ -76,8 +77,8 @@ def main():
     # Start the packet capture.
     # NOTE: I do this before anything else because after calling Thread.start(), it takes some time for the sniffing to actually get going. If I do it later, it's possible for it to miss part of the relevant data. It does include some extra stuff since it's so early, but it's necessary.
     shouldContinueSniffing = True
-    eventLoop = asyncio.get_event_loop()
-    sniffThread = Thread(target = capturePackets, args = [netInterface, eventLoop])
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    sniffThread = Thread(target = capturePackets, args = [netInterface])
     print("Starting Wireshark sniffer.")
     sniffThread.start()
 
@@ -90,7 +91,7 @@ def main():
     ffDriver = webdriver.Firefox(options = options)
     print("Browser launched")
 
-    pathToIndex = os.path.join(os.getcwd(), "index.html")
+    pathToIndex = "file://" + os.path.join(os.getcwd(), "index.html")
 
     print("Navigating browser to " + pathToIndex)
     ffDriver.get(pathToIndex)
@@ -150,7 +151,7 @@ def main():
 
         # Move the data files to the results directory.
         movedLogFilePath = os.path.join(resultsDirPath, mostRecentFileName)
-        os.rename(mostRecentFilePath, movedLogFilePath)
+        shutil.move(mostRecentFilePath, movedLogFilePath)
         print("JavaScript log data moved to " + movedLogFilePath)
 
     # Output packet capture data to the results directory.
@@ -159,12 +160,12 @@ def main():
     packetPcapFilePath = os.path.join(workingDirectory, packetPcapFileName)
     newPacketPcapFilePath = os.path.join(resultsDirPath, packetPcapFileName)
     print("Moving packet PCAP file to " + newPacketPcapFilePath)
-    os.rename(packetPcapFilePath, newPacketPcapFilePath)
+    shutil.move(packetPcapFilePath, newPacketPcapFilePath)
     packetCsvFileName = PACKET_CSV_FILENAME
     packetCsvFilePath = os.path.join(workingDirectory, packetCsvFileName)
     newPacketCsvFilePath = os.path.join(resultsDirPath, packetCsvFileName)
-    print("Moving packet CSV to " + packetCsvFilePath)
-    os.rename(packetCsvFilePath, newPacketCsvFilePath)
+    print("Moving packet CSV to " + newPacketCsvFilePath)
+    shutil.move(packetCsvFilePath, newPacketCsvFilePath)
 
     print("Exiting browser")
     ffDriver.quit()
@@ -181,9 +182,11 @@ def getServerIp(url):
         return ""
     return dnsResult[0].to_text()
 
-def capturePackets(netInterface, eventLoop):
+def capturePackets(netInterface):
     global shouldContinueSniffing, packets
-    asyncio.set_event_loop(eventLoop)
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    asyncio.get_event_loop()
+    asyncio.get_child_watcher()
     liveCapture = NonPromLiveCapture(interface = netInterface, output_file = PACKET_PCAP_FILENAME)
     for _ in liveCapture.sniff_continuously():
         if not shouldContinueSniffing:
