@@ -56,17 +56,22 @@ class NonPromLiveCapture(LiveCapture):
 # NOTE: This flag is used to tell the packet sniffing thread when to stop. Make sure to set it to False at some point or the capture will never stop!
 shouldContinueSniffing = True
 
-def main(netInterface):
+def main():
     global shouldContinueSniffing
-    # TODO: Log any settings at the beginning of running this script. EG the timeout setting, the URL, etc.
 
-    if (len(sys.argv) < 2):
-        print("No URL argument received")
+    if (len(sys.argv) < 3):
+        print("Either URL or network interface arguments were not received.")
+        return
     url = sys.argv[1] # URL should be the first element in the input.
     print("Received URL: " + url)
+    netInterface = sys.argv[2] # Network interface should be the second element in the input.
+    print("Listening on network interface: " + netInterface)
 
     serverIp = getServerIp(url)
     print("Server IP: " + serverIp)
+
+    print("Test will time out and terminate if video stream takes longer than %s seconds."%STREAM_TIMEOUT_SEC)
+    print("Assuming total header length of %s bytes."%TOTAL_HDR_LEN_B)
 
     # Start the packet capture.
     # NOTE: I do this before anything else because after calling Thread.start(), it takes some time for the sniffing to actually get going. If I do it later, it's possible for it to miss part of the relevant data. It does include some extra stuff since it's so early, but it's necessary.
@@ -78,7 +83,7 @@ def main(netInterface):
 
     options = Options()
     print("Options created")
-    #options.add_argument("-headless")
+    options.add_argument("-headless")
     #options.add_argument("-P")
     #options.add_argument("headlessTester")
     print("Options set. Launching browser")
@@ -116,7 +121,7 @@ def main(netInterface):
     print("Stopping packet sniffer")
     shouldContinueSniffing = False
     sniffThread.join()
-    print("Packet sniffer stopped")
+    print("Packet sniffer stop signal sent")
     print("Waiting 5 seconds for live capture to complete.")
     time.sleep(5)
 
@@ -215,4 +220,4 @@ def getLatestFileContainsNamePath(dirPath, name):
     return mostRecent
 
 if __name__ == "__main__":
-    main(netInterface = "Wi-Fi")
+    main()
