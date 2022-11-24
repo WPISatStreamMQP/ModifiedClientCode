@@ -104,8 +104,11 @@ def main():
     web_urlInput.clear()
     web_urlInput.send_keys(url)
 
+    now_iso = datetime.datetime.now().isoformat()
+
     # Start the stream.
-    print("Starting stream.")
+    # I include the time so that you can watch the console output and know roughly how long it's been running for.
+    print("Starting stream at time " + now_iso)
     web_urlConfirmButton = WebDriverWait(ffDriver, GENERIC_TIMEOUT_SEC).until(EC.presence_of_element_located((By.ID, URL_CONFIRM_BUTTON_ID)))
     web_urlConfirmButton.click()
 
@@ -131,9 +134,8 @@ def main():
 
     # Make a directory for this run of the test.
     workingDirectory = os.getcwd()
-    now_iso = datetime.datetime.now().isoformat().replace(":", "_") # Replace colons with underscores because Windows is evil.
     myHostname = socket.gethostname()
-    resultsDirName = "Results_" + now_iso + "_" + myHostname
+    resultsDirName = "Results_" + now_iso.replace(":", "_") + "_" + myHostname # Replace colons with underscores because Windows is evil.
     resultsDirPath = os.path.join(workingDirectory, resultsDirName)
     os.mkdir(resultsDirPath)
     print("Results will be saved in directory " + resultsDirPath)
