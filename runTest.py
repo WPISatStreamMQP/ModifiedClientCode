@@ -24,7 +24,7 @@ IP_HDR_LEN_MAX_B = 60
 TCP_HDR_LEN_MAX_B = 60 # 20 bytes usually, but 60 is the absolute max supported due to the size of the IHL field.
 TOTAL_HDR_LEN_B = ETH_HDR_LEN_B + IP_HDR_LEN_MAX_B + TCP_HDR_LEN_MAX_B
 
-STREAM_TIMEOUT_SEC = 900 # Timeout streams after 15 minutes and assume it encountered errors.
+STREAM_TIMEOUT_SEC = 1800 # Timeout streams after 30 minutes and assume it encountered errors.
 GENERIC_TIMEOUT_SEC = 3 # When accessing a regular element, timeout after just three seconds.
 
 URL_INPUT_FIELD_ID = "urlInput"
