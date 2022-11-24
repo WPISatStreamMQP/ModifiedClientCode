@@ -1,11 +1,3 @@
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
-from pyshark import LiveCapture, FileCapture
-from threading import Thread
 import os
 import sys
 import datetime
@@ -14,6 +6,16 @@ import pyshark
 import asyncio
 import csv
 import time
+import dns.resolver
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+from pyshark import LiveCapture
+from threading import Thread
+from urllib.parse import urlparse
 
 ETH_HDR_LEN_B = 14
 IP_HDR_LEN_MAX_B = 60
@@ -32,9 +34,10 @@ SAVE_BUTTON_ID = "save_btn"
 PACKET_PCAP_FILENAME = "packets.pcap"
 PACKET_CSV_FILENAME = "packets.csv"
 
-TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields"\
-                            "-e _ws.col.Time -e frame.len -e ip.src -e ip.dst"\
-                            "-E header=y -E separator=,"\
+TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields "\
+                            "-e _ws.col.Time -e frame.len -e ip.src -e ip.dst "\
+                            "-E header=y -E separator=, "\
+                            "-Y \"(ip.src == {serverIp}) || (ip.dst == {serverIp})\" "\
                             "> {csvName}"
 
 class NonPromLiveCapture(LiveCapture):
@@ -61,6 +64,9 @@ def main(netInterface):
         print("No URL argument received")
     url = sys.argv[1] # URL should be the first element in the input.
     print("Received URL: " + url)
+
+    serverIp = getServerIp(url)
+    print("Server IP: " + serverIp)
 
     # Start the packet capture.
     # NOTE: I do this before anything else because after calling Thread.start(), it takes some time for the sniffing to actually get going. If I do it later, it's possible for it to miss part of the relevant data. It does include some extra stuff since it's so early, but it's necessary.
@@ -115,7 +121,7 @@ def main(netInterface):
     time.sleep(5)
 
     print("Processing file output from live capture.")
-    processPackets(PACKET_PCAP_FILENAME)
+    processPackets(PACKET_PCAP_FILENAME, PACKET_CSV_FILENAME, serverIp)
 
     # Make a directory for this run of the test.
     workingDirectory = os.getcwd()
@@ -159,6 +165,17 @@ def main(netInterface):
     ffDriver.quit()
     print("Test completed. Exiting")
 
+def getServerIp(url):
+    if not url:
+        return ""
+    parsedUrl = urlparse(url)
+    
+    host = parsedUrl.hostname
+    dnsResult = dns.resolver.resolve(host, "A") # Search for `A` (IPv4) records.
+    if len(dnsResult) == 0:
+        return ""
+    return dnsResult[0].to_text()
+
 def capturePackets(netInterface, eventLoop):
     global shouldContinueSniffing, packets
     asyncio.set_event_loop(eventLoop)
@@ -169,9 +186,11 @@ def capturePackets(netInterface, eventLoop):
             liveCapture.close()
             break
 
-def processPackets(fileName):
+def processPackets(pcapFileName, csvFileName, serverIp):
     # This will return once the tshark command completes. I.e., it will block until processing is done.
-    tsharkCommand = TSHARK_FILEOUTPUT_COMMAND.format(pcapName = PACKET_PCAP_FILENAME, csvName = PACKET_CSV_FILENAME)
+    tsharkCommand = TSHARK_FILEOUTPUT_COMMAND.format(pcapName = pcapFileName,
+                                                     csvName = csvFileName,
+                                                     serverIp = serverIp)
     os.system(tsharkCommand)
 
 def outputPackets(fileName, packets):
