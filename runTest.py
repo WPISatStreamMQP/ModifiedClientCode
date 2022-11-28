@@ -57,15 +57,9 @@ class NonPromLiveCapture(LiveCapture):
 # NOTE: This flag is used to tell the packet sniffing thread when to stop. Make sure to set it to False at some point or the capture will never stop!
 shouldContinueSniffing = True
 
-def main():
+def runSingleTest(url, netInterface):
     global shouldContinueSniffing
 
-    if (len(sys.argv) < 3):
-        print("Either URL or network interface arguments were not received.")
-        return
-    url = sys.argv[1] # URL should be the first element in the input.
-    print("Received URL: " + url)
-    netInterface = sys.argv[2] # Network interface should be the second element in the input.
     print("Listening on network interface: " + netInterface)
 
     serverIp = getServerIp(url)
@@ -84,7 +78,7 @@ def main():
 
     options = Options()
     print("Options created")
-    options.add_argument("-headless")
+    #options.add_argument("-headless")
     #options.add_argument("-P")
     #options.add_argument("headlessTester")
     print("Options set. Launching browser")
@@ -223,6 +217,16 @@ def getLatestFileContainsNamePath(dirPath, name):
         return ""
     mostRecent = files[-1]
     return mostRecent
+
+def main():
+    if (len(sys.argv) < 3):
+        print("Either URL or network interface arguments were not received.")
+        return
+    url = sys.argv[1] # URL should be the first element in the input.
+    print("Received URL: " + url)
+    netInterface = sys.argv[2] # Network interface should be the second element in the input.
+
+    runSingleTest(url, netInterface)
 
 if __name__ == "__main__":
     main()
