@@ -17,6 +17,8 @@ from selenium.common.exceptions import TimeoutException
 from pyshark import LiveCapture
 from threading import Thread
 from urllib.parse import urlparse
+import csv
+import os , signal
 
 ETH_HDR_LEN_B = 14
 IP_HDR_LEN_MAX_B = 60
@@ -82,6 +84,13 @@ def main():
     print("Starting Wireshark sniffer.")
     sniffThread.start()
 
+
+    # Start UDPing
+    eventLoop2 = asyncio.get_event_loop()
+    pingThread = Thread(target=startUDPing,args=[eventLoop2])
+    print(("Starting UDPing"))
+    pingThread.start()
+
     options = Options()
     print("Options created")
     options.add_argument("-headless")
@@ -121,6 +130,10 @@ def main():
         # Since the stream failed to finish, it has not saved the log. Do that for it.
         web_saveButton = ffDriver.find_element(By.ID, SAVE_BUTTON_ID)
         web_saveButton.click()
+
+    print("Stopping UDPping")
+    processKill()
+    pingThread.join()
     
     print("Stopping packet sniffer")
     shouldContinueSniffing = False
@@ -144,17 +157,28 @@ def main():
     # After the save button is clicked, the done label will be filled with the title of the saved file.
     logName = web_doneLabel.get_attribute("textContent")
     downloadsPath = os.path.join(os.path.expanduser("~"), "Downloads") # This works on both Linux and Windows, assuming the downloads folder is the default.
+    currentPath = os.path.join(os.getcwd())
     # Still have to search for the most recent file that contains the name because the JS player doesn't know if it was downloaded with a duplicate identifier (like `(1)`, `(2)`, etc) appended.
     mostRecentFileName = getLatestFileContainsNamePath(downloadsPath, logName)
+    mostRecentFileNameUDPing = getLatestFileContainsNamePath(currentPath, "UDPing_log.csv")
     if (mostRecentFileName == ""):
         print("No JavaScript log file located. File will not be moved.")
+    if(mostRecentFileNameUDPing == ""):
+        print("No UDPing log file located. File will not be moved.")
+
     else:
         mostRecentFilePath = os.path.join(downloadsPath, mostRecentFileName)
+        mostRecentFilePathUDPing = os.path.join(currentPath, mostRecentFileNameUDPing)
 
         # Move the data files to the results directory.
         movedLogFilePath = os.path.join(resultsDirPath, mostRecentFileName)
+        movedLogFilePathUDPing = os.path.join(resultsDirPath, mostRecentFileNameUDPing)
+
         shutil.move(mostRecentFilePath, movedLogFilePath)
+        shutil.move(mostRecentFilePathUDPing, movedLogFilePathUDPing)
+
         print("JavaScript log data moved to " + movedLogFilePath)
+        print("UDPing  log data moved to " + movedLogFilePathUDPing)
 
     # Output packet capture data to the results directory.
     print("Outputting Wireshark captured packets")
@@ -172,6 +196,27 @@ def main():
     print("Exiting browser")
     ffDriver.quit()
     print("Test completed. Exiting")
+
+def startUDPing(eventLoop2):
+    asyncio.set_event_loop(eventLoop2)
+    os.system("./cUDPingLnx 1234")
+    print("Process cUDPing Successfully terminated")
+def processKill():
+    name = 'cUDPing'
+    try:
+
+        # iterating through each instance of the process
+        for line in os.popen("ps ax | grep " + name + " | grep -v grep"):
+            fields = line.split()
+
+            # extracting Process ID from the output
+            pid = fields[0]
+
+            # terminating process
+            os.kill(int(pid), signal.SIGINT)
+
+    except:
+        print("Error Encountered while tyring to kill cUDPing")
 
 def getServerIp(url):
     if not url:
