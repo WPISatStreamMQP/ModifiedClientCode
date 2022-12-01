@@ -86,12 +86,12 @@ def main():
 
 
     # Start UDPing
-    eventLoop2 = asyncio.get_event_loop()
-    pingThread = Thread(target=startUDPing,args=[eventLoop2])
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    pingThread = Thread(target=startUDPing)
     print(("Starting UDPing"))
     pingThread.start()
-
     options = Options()
+
     print("Options created")
     options.add_argument("-headless")
     #options.add_argument("-P")
@@ -197,9 +197,11 @@ def main():
     ffDriver.quit()
     print("Test completed. Exiting")
 
-def startUDPing(eventLoop2):
-    asyncio.set_event_loop(eventLoop2)
-    os.system("./cUDPingLnx 1234")
+def startUDPing():
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    asyncio.get_event_loop()
+    asyncio.get_child_watcher()
+    os.system("./cUDPingLnx -p 1234 -h mlcneta.cs.wpi.edu")
     print("Process cUDPing Successfully terminated")
 def processKill():
     name = 'cUDPing'
