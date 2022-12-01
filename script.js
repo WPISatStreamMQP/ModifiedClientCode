@@ -43,6 +43,10 @@ function getTimeElapsedSec(startTime, endTime) {
 
 function onStalled() {
     stallStartTime = new Date();
+    let absTimeElapsedSincePlayBackStartSec = getTimeElapsedSec(absPlaybackStartTime, stallStartTime)
+
+    let logMsg = "STALL  started at " + absTimeElapsedSincePlayBackStartSec +" sec";
+    data.push(logMsg);
 };
 
 function onStarted() {
@@ -52,9 +56,10 @@ function onStarted() {
     var stallStopTime = new Date();
 
     var timeElapsedMs = getTimeElapsedSec(stallStartTime, stallStopTime) * 1000;
+    let absTimeElapsedSincePlayBackStartSec = getTimeElapsedSec(absPlaybackStartTime, stallStopTime)
 
     // Log the time that the stall started.
-    var logMsg = "STALL  " + timeElapsedMs + " ms";
+    var logMsg = "STALL  " + timeElapsedMs + " ms and stopped at "+ absTimeElapsedSincePlayBackStartSec+" sec";
     data.push(logMsg);
 
     stallStartTime = null;
