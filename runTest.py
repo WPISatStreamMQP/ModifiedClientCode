@@ -36,6 +36,7 @@ SAVE_BUTTON_ID = "save_btn"
 
 PACKET_PCAP_FILENAME = "packets.pcap"
 PACKET_CSV_FILENAME = "packets.csv"
+UDPING_LOG_FILENAME = "UDPing_log.csv"
 
 TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields "\
                             "-e _ws.col.Time -e frame.len -e ip.src -e ip.dst "\
@@ -87,7 +88,7 @@ def runSingleTest(url, netInterface):
     options = Options()
 
     print("Options created")
-    #options.add_argument("-headless")
+    options.add_argument("-headless")
     #options.add_argument("-P")
     #options.add_argument("headlessTester")
     print("Options set. Launching browser")
@@ -126,7 +127,7 @@ def runSingleTest(url, netInterface):
         web_saveButton.click()
 
     print("Stopping UDPping")
-    processKill()
+    killUDPingProcess()
     pingThread.join()
     
     print("Stopping packet sniffer")
@@ -154,25 +155,26 @@ def runSingleTest(url, netInterface):
     currentPath = os.path.join(os.getcwd())
     # Still have to search for the most recent file that contains the name because the JS player doesn't know if it was downloaded with a duplicate identifier (like `(1)`, `(2)`, etc) appended.
     mostRecentFileName = getLatestFileContainsNamePath(downloadsPath, logName)
-    mostRecentFileNameUDPing = getLatestFileContainsNamePath(currentPath, "UDPing_log.csv")
     if (mostRecentFileName == ""):
         print("No JavaScript log file located. File will not be moved.")
-    if(mostRecentFileNameUDPing == ""):
-        print("No UDPing log file located. File will not be moved.")
-
     else:
         mostRecentFilePath = os.path.join(downloadsPath, mostRecentFileName)
-        mostRecentFilePathUDPing = os.path.join(currentPath, mostRecentFileNameUDPing)
 
         # Move the data files to the results directory.
         movedLogFilePath = os.path.join(resultsDirPath, mostRecentFileName)
-        movedLogFilePathUDPing = os.path.join(resultsDirPath, mostRecentFileNameUDPing)
-
         shutil.move(mostRecentFilePath, movedLogFilePath)
-        shutil.move(mostRecentFilePathUDPing, movedLogFilePathUDPing)
-
         print("JavaScript log data moved to " + movedLogFilePath)
-        print("UDPing  log data moved to " + movedLogFilePathUDPing)
+    
+    mostRecentFileNameUDPing = getLatestFileContainsNamePath(currentPath, UDPING_LOG_FILENAME)
+    if(mostRecentFileNameUDPing == ""):
+        print("No UDPing log file located. File will not be moved.")
+    else:
+        mostRecentFilePathUDPing = os.path.join(currentPath, mostRecentFileNameUDPing)
+
+        # Move the data files to the results directory.
+        movedLogFilePathUDPing = os.path.join(resultsDirPath, mostRecentFileNameUDPing)
+        shutil.move(mostRecentFilePathUDPing, movedLogFilePathUDPing)
+        print("UDPing log data moved to " + movedLogFilePathUDPing)
 
     # Output packet capture data to the results directory.
     print("Outputting Wireshark captured packets")
@@ -196,8 +198,9 @@ def startUDPing():
     asyncio.get_event_loop()
     asyncio.get_child_watcher()
     os.system("./cUDPingLnx -p 1234 -h mlcneta.cs.wpi.edu")
-    print("Process cUDPing Successfully terminated")
-def processKill():
+    print("Process cUDPing Successfully started")
+
+def killUDPingProcess():
     name = 'cUDPing'
     try:
 
