@@ -324,8 +324,8 @@ void DatagramClient(char *szServer, short nPort)
      //
      // Display the data that was received
      //
-     printf("Reply from %s: bytes=%d rtt=%dms seq=%d tSent=%dms\n",
-	    nmServer, sPkt, rtt, ping_pkt.seq, tSent);
+     /*printf("Reply from %s: bytes=%d rtt=%dms seq=%d tSent=%dms\n",
+	    nmServer, sPkt, rtt, ping_pkt.seq, tSent);*/
 //     out_file << "Reply from " << nmServer << ": bytes=" <<  sPkt << " rtt=" << rtt << "ms" << " seq="
 //     << ping_pkt.seq << " tSent=" <<  tSent << "ms\n" ; // to file
      out_file_csv << nmServer << "," << sPkt << "," << rtt << "," << ping_pkt.seq << "," << tSent << "\n";
