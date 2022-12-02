@@ -1,2 +1,5 @@
 Results_*
 *.log
+*.csv
+[c|s]UDPingWin.exe
+[c|s]UDPingLnx
