@@ -197,8 +197,10 @@ def startUDPing():
     asyncio.set_event_loop(asyncio.new_event_loop())
     asyncio.get_event_loop()
     asyncio.get_child_watcher()
+    print("Starting cUDPing process")
+    # This will block until UDPing returns (when it finishes).
     os.system("./cUDPingLnx -p 1234 -h mlcneta.cs.wpi.edu")
-    print("Process cUDPing Successfully started")
+    print("cUDPing process successfully killed.")
 
 def killUDPingProcess():
     name = 'cUDPing'
@@ -212,6 +214,7 @@ def killUDPingProcess():
             pid = fields[0]
 
             # terminating process
+            print("Sending SIGINT to cUDPing")
             os.kill(int(pid), signal.SIGINT)
 
     except:
