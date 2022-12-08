@@ -232,7 +232,8 @@ def startTSharkOnServer(url):
         return
     # We are accessing an MLCNet server, so we can do SSH commands to it.
     # The ampersands detach from the process so this function doesn't block until tshark terminates.
-    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"tshark -w ~/output.pcap &\" &".format(host = hostname))
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"tshark -w ~/output.pcap -s {snaplen} &\" &".format(host = hostname,
+                                                                                                       snaplen = TOTAL_HDR_LEN_B))
 
 def killTSharkOnServer(url):
     hostname = getHostname(url)
