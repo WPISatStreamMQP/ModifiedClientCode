@@ -43,6 +43,7 @@ def get_time_elapsed_stall_mapping(filename):
         os.makedirs('Stall_Results')
 
     df = pd.DataFrame({'x': x, 'y': y_sec})
+    print(df.head())
     num_col = df._get_numeric_data().columns[1]
 
     describe_num_df = df.mask(df == 0).describe()
@@ -120,6 +121,29 @@ def get_time_elapsed_qual_mapping(filename):
     print(y)
 
 
+def analyze_size_of_buffer(log_file):
+    # df = pd.read_csv(log_file, sep="\n", names=['Params'])
+
+    path_name = os.path.join(os.getcwd(),log_file)
+
+    df = pd.read_csv(path_name, sep="\\n", names=['Params'])
+
+    log_df = df["Params"].str.extract(r"LOG  (?P<realtime_elapsed>\d+\.?\d*),(?P<current_time>\d+\.?\d*):(?P<current_fps>\d*),(?P<current_horizontal_resolution>\d+)x(?P<cur_vert_res>\d*),(?P<current_bitrate>\d+),(?P<current_size_of_buffer>\d+\.?\d*)")
+    # log_df["current_size_of_buffer"]=pd.to_numeric(log_df["current_size_of_buffer"])
+    log_df = log_df.apply(pd.to_numeric)
+    # log_df["realtime_elapsed"]=pd.to_numeric(log_df["realtime_elapsed"])
+    log_df = log_df.dropna()
+    summary_csv = log_df.describe().to_csv()
+
+    fig = px.line(log_df, x="realtime_elapsed", y="current_size_of_buffer", title='realtime_elapsed vs current_size_of_buffer').update_layout(
+        xaxis_title="realtime_elapsed(Sec)", yaxis_title="current_size_of_buffer(Sec)",xaxis_tickformat=',d'
+    )
+    if not os.path.exists('Size_of_Buffer_Results'):
+        os.makedirs('Size_of_Buffer_Results')
+    path_Name = os.path.join(os.getcwd(), 'Size_of_Buffer_Results', '{}_Size_of_Buffer_Results_.html'.format(log_file))
+    fig.write_html(path_Name)
+    # return summary_csv,img
+
 if __name__ == "__main__":
     logCounter = len(glob.glob1(os.getcwd(), "*.log"))
     print(str(logCounter) + " log files found")
@@ -129,6 +153,7 @@ if __name__ == "__main__":
         print(fileName)
         get_time_elapsed_stall_mapping(fileName)
         get_time_elapsed_qual_mapping(fileName)
+        analyze_size_of_buffer(fileName)
 
     output_doc = BeautifulSoup()
     output_doc.append(output_doc.new_tag("html"))
