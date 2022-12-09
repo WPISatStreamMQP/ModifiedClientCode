@@ -247,7 +247,10 @@ def downloadPacketsFromServer(url):
     if (hostname not in MLCNET_SERVER_HOSTNAMES):
         return
     # We are accessing an MLCNet server, so we can do SSH commands to it.
-    os.system("scp -i ~/.ssh/id_rsa_script {host}:~/output.pcap ./packets_server.pcap".format(host = hostname))
+    #os.system("scp -i ~/.ssh/id_rsa_script {host}:~/output.pcap ./packets_server.pcap".format(host = hostname))
+    # Run the SCP command from MLCNet to Glomma (rather than the other way around) so that the transfer gets routed over LAN (instead of satellite) and is much faster.
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"scp -i ~/.ssh/id_rsa_mlcnet_to_glomma ~/output.pcap glomma:{workingDir}/packets_server.pcap\""
+              .format(host = hostname, workingDir = os.getcwd()))
     os.system("ssh -i ~/.ssh/id_rsa_script {host} \"rm ~/output.pcap\"".format(host = hostname))
 
 def startUDPing():
