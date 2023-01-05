@@ -247,11 +247,19 @@ def downloadPacketsFromServer(url):
     if (hostname not in MLCNET_SERVER_HOSTNAMES):
         return
     # We are accessing an MLCNet server, so we can do SSH commands to it.
-    #os.system("scp -i ~/.ssh/id_rsa_script {host}:~/output.pcap ./packets_server.pcap".format(host = hostname))
-    # Run the SCP command from MLCNet to Glomma (rather than the other way around) so that the transfer gets routed over LAN (instead of satellite) and is much faster.
-    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"scp -i ~/.ssh/id_rsa_mlcnet_to_glomma ~/output.pcap glomma:{workingDir}/packets_server.pcap\""
-              .format(host = hostname, workingDir = os.getcwd()))
+
+    # Copy the packet file from the server over to linux.cs.wpi.edu, then from linux.cs.. back to glomma. We need to do two transfers because downloading from glomma will run over the satellite (slowly), and uploading directly to Glomma from MLCNetA will fail because Glomma's acknowledgement messages will be returned over the satellite and MLCNet doesn't expect that.
+    
+    # Copies from host to linux.cs...
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"scp -i ~/.ssh/id_rsa_script ~/output.pcap linux.cs.wpi.edu:~/output.pcap\""
+              .format(host = hostname))
+    # Copies from linux.cs.. to here.
+    os.system("ssh -i ~/.ssh/id_rsa_script linux.cs.wpi.edu \"scp -i ~/.ssh/id_rsa_script ~/output.pcap glomma:{workingDir}/packets_server.pcap\""
+              .format(workingDir = os.getcwd()))
+    # Delete packet file from the host.
     os.system("ssh -i ~/.ssh/id_rsa_script {host} \"rm ~/output.pcap\"".format(host = hostname))
+    # Delete packet file from linux.cs...
+    os.system("ssh -i ~/.ssh/id_rsa_script linux.cs.wpi.edu \"rm ~/output.pcap\"")
 
 def startUDPing():
     asyncio.set_event_loop(asyncio.new_event_loop())
