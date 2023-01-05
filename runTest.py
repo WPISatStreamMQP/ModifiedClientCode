@@ -34,9 +34,13 @@ URL_CONFIRM_BUTTON_ID = "urlConfirmButton"
 STREAM_DONE_LABEL_ID = "streamDoneLabel"
 SAVE_BUTTON_ID = "save_btn"
 
-PACKET_PCAP_FILENAME = "packets.pcap"
-PACKET_CSV_FILENAME = "packets.csv"
+CLIENT_PACKET_PCAP_FILENAME = "packets_client.pcap"
+SERVER_PACKET_PCAP_FILENAME = "packets_server.pcap"
+CLIENT_PACKET_CSV_FILENAME = "packets_client.csv"
+SERVER_PACKET_CSV_FILENAME = "packets_server.csv"
 UDPING_LOG_FILENAME = "UDPing_log.csv"
+
+MLCNET_SERVER_HOSTNAMES = ["mlcneta.cs.wpi.edu", "mlcnetb.cs.wpi.edu", "mlcnetc.cs.wpi.edu", "mlcnetd.cs.wpi.edu"]
 
 TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields "\
                             "-e _ws.col.Time -e frame.len -e ip.src -e ip.dst "\
@@ -71,19 +75,23 @@ def runSingleTest(url, netInterface):
     print("Test will time out and terminate if video stream takes longer than %s seconds."%STREAM_TIMEOUT_SEC)
     print("Assuming total header length of %s bytes."%TOTAL_HDR_LEN_B)
 
-    # Start the packet capture.
+    # Start the server packet capture.
+    print("Starting Wireshark sniffer on server.")
+    startTSharkOnServer(url)
+
+    # Start the client packet capture.
     # NOTE: I do this before anything else because after calling Thread.start(), it takes some time for the sniffing to actually get going. If I do it later, it's possible for it to miss part of the relevant data. It does include some extra stuff since it's so early, but it's necessary.
     shouldContinueSniffing = True
     asyncio.set_event_loop(asyncio.new_event_loop())
     sniffThread = Thread(target = capturePackets, args = [netInterface])
-    print("Starting Wireshark sniffer.")
+    print("Starting Wireshark sniffer on client (here).")
     sniffThread.start()
 
 
     # Start UDPing
     asyncio.set_event_loop(asyncio.new_event_loop())
     pingThread = Thread(target=startUDPing)
-    print(("Starting UDPing"))
+    print("Starting UDPing")
     pingThread.start()
     options = Options()
 
@@ -129,16 +137,25 @@ def runSingleTest(url, netInterface):
     print("Stopping UDPping")
     killUDPingProcess()
     pingThread.join()
+
+    print("Stopping server packet sniffer.")
+    killTSharkOnServer(url)
     
-    print("Stopping packet sniffer")
+    print("Stopping client (here) packet sniffer.")
     shouldContinueSniffing = False
     sniffThread.join()
     print("Packet sniffer stop signal sent")
+
+    # Ran this here because it takes time so we can use this wait to allow the local capture to stop.
+    print("Downloading packet capture from server.")
+    downloadPacketsFromServer(url)
+
     print("Waiting 5 seconds for live capture to complete.")
     time.sleep(5)
 
     print("Processing file output from live capture.")
-    processPackets(PACKET_PCAP_FILENAME, PACKET_CSV_FILENAME, serverIp)
+    processPackets(CLIENT_PACKET_PCAP_FILENAME, CLIENT_PACKET_CSV_FILENAME, serverIp)
+    processPackets(SERVER_PACKET_PCAP_FILENAME, SERVER_PACKET_CSV_FILENAME, serverIp)
 
     # Make a directory for this run of the test.
     workingDirectory = os.getcwd()
@@ -177,21 +194,72 @@ def runSingleTest(url, netInterface):
         print("UDPing log data moved to " + movedLogFilePathUDPing)
 
     # Output packet capture data to the results directory.
+    # Move client packet data.
     print("Outputting Wireshark captured packets")
-    packetPcapFileName = PACKET_PCAP_FILENAME
-    packetPcapFilePath = os.path.join(workingDirectory, packetPcapFileName)
-    newPacketPcapFilePath = os.path.join(resultsDirPath, packetPcapFileName)
-    print("Moving packet PCAP file to " + newPacketPcapFilePath)
-    shutil.move(packetPcapFilePath, newPacketPcapFilePath)
-    packetCsvFileName = PACKET_CSV_FILENAME
-    packetCsvFilePath = os.path.join(workingDirectory, packetCsvFileName)
-    newPacketCsvFilePath = os.path.join(resultsDirPath, packetCsvFileName)
-    print("Moving packet CSV to " + newPacketCsvFilePath)
-    shutil.move(packetCsvFilePath, newPacketCsvFilePath)
+    clientPacketPcapFileName = CLIENT_PACKET_PCAP_FILENAME
+    clientPacketPcapFilePath = os.path.join(workingDirectory, clientPacketPcapFileName)
+    newClientPacketPcapFilePath = os.path.join(resultsDirPath, clientPacketPcapFileName)
+    print("Moving client packet PCAP file to " + newClientPacketPcapFilePath)
+    shutil.move(clientPacketPcapFilePath, newClientPacketPcapFilePath)
+
+    clientPacketCsvFileName = CLIENT_PACKET_CSV_FILENAME
+    clientPacketCsvFilePath = os.path.join(workingDirectory, clientPacketCsvFileName)
+    newClientPacketCsvFilePath = os.path.join(resultsDirPath, clientPacketCsvFileName)
+    print("Moving client packet CSV to " + newClientPacketCsvFilePath)
+    shutil.move(clientPacketCsvFilePath, newClientPacketCsvFilePath)
+
+    # Move server packet data.
+    serverPacketPcapFileName = SERVER_PACKET_PCAP_FILENAME
+    serverPacketPcapFilePath = os.path.join(workingDirectory, serverPacketPcapFileName)
+    newServerPacketPcapFilePath = os.path.join(resultsDirPath, serverPacketPcapFileName)
+    print("Moving server packet PCAP file to " + newServerPacketPcapFilePath)
+    shutil.move(serverPacketPcapFilePath, newServerPacketPcapFilePath)
+
+    serverPacketCsvFileName = SERVER_PACKET_CSV_FILENAME
+    serverPacketCsvFilePath = os.path.join(workingDirectory, serverPacketCsvFileName)
+    newServerPacketCsvFilePath = os.path.join(resultsDirPath, serverPacketCsvFileName)
+    print("Moving server packet CSV file to " + newServerPacketCsvFilePath)
+    shutil.move(serverPacketCsvFilePath, newServerPacketCsvFilePath)
 
     print("Exiting browser")
     ffDriver.quit()
     print("Test completed. Exiting")
+
+# NON-BLOCKING. Will immediately return after launching tshark.
+def startTSharkOnServer(url):
+    hostname = getHostname(url)
+    if (hostname not in MLCNET_SERVER_HOSTNAMES):
+        return
+    # We are accessing an MLCNet server, so we can do SSH commands to it.
+    # The ampersands detach from the process so this function doesn't block until tshark terminates.
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"tshark -w ~/output.pcap -s {snaplen} &\" &".format(host = hostname,
+                                                                                                       snaplen = TOTAL_HDR_LEN_B))
+
+def killTSharkOnServer(url):
+    hostname = getHostname(url)
+    if (hostname not in MLCNET_SERVER_HOSTNAMES):
+        return
+    # We are accessing an MLCNet server, so we can do SSH commands to it.
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"pkill -15 tshark\"".format(host = hostname))
+
+def downloadPacketsFromServer(url):
+    hostname = getHostname(url)
+    if (hostname not in MLCNET_SERVER_HOSTNAMES):
+        return
+    # We are accessing an MLCNet server, so we can do SSH commands to it.
+
+    # Copy the packet file from the server over to linux.cs.wpi.edu, then from linux.cs.. back to glomma. We need to do two transfers because downloading from glomma will run over the satellite (slowly), and uploading directly to Glomma from MLCNetA will fail because Glomma's acknowledgement messages will be returned over the satellite and MLCNet doesn't expect that.
+    
+    # Copies from host to linux.cs...
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"scp -i ~/.ssh/id_rsa_script ~/output.pcap linux.cs.wpi.edu:~/output.pcap\""
+              .format(host = hostname))
+    # Copies from linux.cs.. to here.
+    os.system("ssh -i ~/.ssh/id_rsa_script linux.cs.wpi.edu \"scp -i ~/.ssh/id_rsa_script ~/output.pcap glomma:{workingDir}/packets_server.pcap\""
+              .format(workingDir = os.getcwd()))
+    # Delete packet file from the host.
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"rm ~/output.pcap\"".format(host = hostname))
+    # Delete packet file from linux.cs...
+    os.system("ssh -i ~/.ssh/id_rsa_script linux.cs.wpi.edu \"rm ~/output.pcap\"")
 
 def startUDPing():
     asyncio.set_event_loop(asyncio.new_event_loop())
@@ -221,22 +289,26 @@ def killUDPingProcess():
         print("Error Encountered while tyring to kill cUDPing")
 
 def getServerIp(url):
-    if not url:
-        return ""
-    parsedUrl = urlparse(url)
-    
-    host = parsedUrl.hostname
+    host = getHostname(url)
     dnsResult = dns.resolver.resolve(host, "A") # Search for `A` (IPv4) records.
     if len(dnsResult) == 0:
         return ""
     return dnsResult[0].to_text()
+
+def getHostname(url):
+    if not url:
+        return ""
+    parsedUrl = urlparse(url)
+
+    host = parsedUrl.hostname
+    return host
 
 def capturePackets(netInterface):
     global shouldContinueSniffing, packets
     asyncio.set_event_loop(asyncio.new_event_loop())
     asyncio.get_event_loop()
     asyncio.get_child_watcher()
-    liveCapture = NonPromLiveCapture(interface = netInterface, output_file = PACKET_PCAP_FILENAME)
+    liveCapture = NonPromLiveCapture(interface = netInterface, output_file = CLIENT_PACKET_PCAP_FILENAME)
     for _ in liveCapture.sniff_continuously():
         if not shouldContinueSniffing:
             print("Stopping live capture.")
