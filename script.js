@@ -222,7 +222,7 @@ function recordStreamMetrics(player) {
         })
         var frameRate = currentRep.frameRate;
         var resolution = currentRep.width + 'x' + currentRep.height;
-        var cur_biterate = player.getAverageThroughput('video', true);
+        var curThroughput = player.getAverageThroughput('video', true);
 
         var t_time=document.getElementById('video').currentTime;
 
@@ -235,7 +235,7 @@ function recordStreamMetrics(player) {
         // Date.getTime() returns milliseconds, so divide by 1000 to convert to seconds.
         var absTimeElapsedSec = getTimeElapsedSec(absPlaybackStartTime, nowTime);
 
-        temp_data="LOG  "+absTimeElapsedSec+","+t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel;
+        temp_data="LOG  "+absTimeElapsedSec+","+t_time+':'+t_fps+','+t_resolution+','+t_bitrate+','+t_bufferLevel+','+curThroughput;
         data.push(temp_data);
 
 
@@ -243,6 +243,6 @@ function recordStreamMetrics(player) {
         document.getElementById('framerate').innerText = frameRate + " fps";
         document.getElementById('reportedBitrate').innerText = bitrate + " Kbps";
         document.getElementById('resolution').innerText = resolution;
-        // document.getElementById('calculatedBitrate').innerText = Math.round(cur_biterate);
+        document.getElementById('curThroughput').innerText = Math.round(curThroughput);
     }
 };
