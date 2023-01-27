@@ -19,6 +19,7 @@ from threading import Thread
 from urllib.parse import urlparse
 import csv
 import os , signal
+import subprocess
 
 ETH_HDR_LEN_B = 14
 IP_HDR_LEN_MAX_B = 60
@@ -75,6 +76,16 @@ def runSingleTest(url, netInterface):
     print("Test will time out and terminate if video stream takes longer than %s seconds."%STREAM_TIMEOUT_SEC)
     print("Assuming total header length of %s bytes."%TOTAL_HDR_LEN_B)
 
+    print("\nCurrent users:")
+    subprocess.Popen("w", shell = True).wait()
+
+    print("\n`ip route` output:")
+    subprocess.Popen("ip route", shell = True).wait()
+
+    print("\nCPU utilization")
+    subprocess.Popen("ps aux --sort -pcpu | grep -v USER | head -n 20", shell = True).wait()
+    print("\n")
+
     # Start the server packet capture.
     print("Starting Wireshark sniffer on server.")
     startTSharkOnServer(url)
@@ -87,15 +98,13 @@ def runSingleTest(url, netInterface):
     print("Starting Wireshark sniffer on client (here).")
     sniffThread.start()
 
-
     # Start UDPing
     asyncio.set_event_loop(asyncio.new_event_loop())
     pingThread = Thread(target=startUDPing)
     print("Starting UDPing")
     pingThread.start()
+    
     options = Options()
-
-    print("Options created")
     options.add_argument("-headless")
     #options.add_argument("-P")
     #options.add_argument("headlessTester")
@@ -120,21 +129,22 @@ def runSingleTest(url, netInterface):
 
     # Start the stream.
     # I include the time so that you can watch the console output and know roughly how long it's been running for.
-    print("Starting stream at time " + now_iso)
+    # Asterisks are to call attention to when the stream actually started.
+    print("\n************* Starting stream at time " + now_iso)
     web_urlConfirmButton = WebDriverWait(ffDriver, GENERIC_TIMEOUT_SEC).until(EC.presence_of_element_located((By.ID, URL_CONFIRM_BUTTON_ID)))
     web_urlConfirmButton.click()
 
     try:
         web_doneLabel = WebDriverWait(ffDriver, STREAM_TIMEOUT_SEC).until(EC.visibility_of_element_located((By.ID, STREAM_DONE_LABEL_ID)))
         # Successfully loaded the done label, so the stream finished. This means the log will have been saved by the JS script.
-        print("Stream completed.")
+        print("************* Stream completed.\n")
     except TimeoutException:
-        print("Timeout limit reached before stream completed.")
+        print("************* Timeout limit reached before stream completed.\n")
         # Since the stream failed to finish, it has not saved the log. Do that for it.
         web_saveButton = ffDriver.find_element(By.ID, SAVE_BUTTON_ID)
         web_saveButton.click()
 
-    print("Stopping UDPping")
+    print("Stopping UDPing")
     killUDPingProcess()
     pingThread.join()
 
@@ -221,7 +231,7 @@ def runSingleTest(url, netInterface):
     print("Moving server packet CSV file to " + newServerPacketCsvFilePath)
     shutil.move(serverPacketCsvFilePath, newServerPacketCsvFilePath)
 
-    print("Exiting browser")
+    print("Closing browser")
     ffDriver.quit()
     print("Test completed. Exiting")
 
@@ -286,7 +296,7 @@ def killUDPingProcess():
             os.kill(int(pid), signal.SIGINT)
 
     except:
-        print("Error Encountered while tyring to kill cUDPing")
+        print("Error Encountered while trying to kill cUDPing")
 
 def getServerIp(url):
     host = getHostname(url)
