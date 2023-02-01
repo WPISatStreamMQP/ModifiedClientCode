@@ -252,6 +252,20 @@ def killTSharkOnServer(url):
     # We are accessing an MLCNet server, so we can do SSH commands to it.
     os.system("ssh -i ~/.ssh/id_rsa_script {host} \"pkill -15 tshark\"".format(host = hostname))
 
+def startUDPingOnServer(url,port):
+    hostname = getHostname(url)
+    if (hostname not in MLCNET_SERVER_HOSTNAMES):
+        return
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"~/UDPing/sUDPingLnx {host}:{port} &\" &".format(host = hostname, port = port))
+
+def killUDPingOnServer(url):
+    hostname = getHostname(url)
+    if (hostname not in MLCNET_SERVER_HOSTNAMES):
+        return
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"pkill -15 sUDPingLnx\"".format(host = hostname))
+
+
+
 def downloadPacketsFromServer(url):
     hostname = getHostname(url)
     if (hostname not in MLCNET_SERVER_HOSTNAMES):
