@@ -17,6 +17,7 @@ var loadBtn = document.getElementById("urlConfirmButton");
 
 var absVideoLoadStartTime = null;
 var absPlaybackStartTime = null;
+var stallStartTime = null;
 var videoUrl = null;
 var outputFileName = null;
 
