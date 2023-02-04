@@ -17,6 +17,7 @@ var loadBtn = document.getElementById("urlConfirmButton");
 
 var absVideoLoadStartTime = null;
 var absPlaybackStartTime = null;
+var stallStartTime = null;
 var videoUrl = null;
 var outputFileName = null;
 
@@ -197,7 +198,7 @@ function display(){
         const bitrateInterval = 5;
         var bitrateCalculator = setInterval(function () {
             var calculatedBitrate = (((video.webkitVideoDecodedByteCount - lastDecodedByteCount) / 1000) * 8) / bitrateInterval;
-            document.getElementById('calculatedBitrate').innerText = Math.round(calculatedBitrate) + " Kbps";
+            document.getElementById('reportedBitrate').innerText = Math.round(calculatedBitrate) + " Kbps";
             lastDecodedByteCount = video.webkitVideoDecodedByteCount;
         }, bitrateInterval * 1000);
     } else {
