@@ -48,6 +48,7 @@ TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields "\
                             "-E header=y -E separator=, "\
                             "-Y \"(ip.src == {serverIp}) || (ip.dst == {serverIp})\" "\
                             "> {csvName}"
+PORT = 1234
 
 class NonPromLiveCapture(LiveCapture):
     def get_parameters(self, packet_count=None):
@@ -89,6 +90,7 @@ def runSingleTest(url, netInterface):
     # Start the server packet capture.
     print("Starting Wireshark sniffer on server.")
     startTSharkOnServer(url)
+    startUDPingOnServer(url,PORT)
 
     # Start the client packet capture.
     # NOTE: I do this before anything else because after calling Thread.start(), it takes some time for the sniffing to actually get going. If I do it later, it's possible for it to miss part of the relevant data. It does include some extra stuff since it's so early, but it's necessary.
@@ -148,6 +150,7 @@ def runSingleTest(url, netInterface):
     killUDPingProcess()
     pingThread.join()
 
+    killUDPingOnServer(url)
     print("Stopping server packet sniffer.")
     killTSharkOnServer(url)
     
@@ -253,12 +256,14 @@ def killTSharkOnServer(url):
     os.system("ssh -i ~/.ssh/id_rsa_script {host} \"pkill -15 tshark\"".format(host = hostname))
 
 def startUDPingOnServer(url,port):
+    print("Starting UDPing on the server.")
     hostname = getHostname(url)
     if (hostname not in MLCNET_SERVER_HOSTNAMES):
         return
     os.system("ssh -i ~/.ssh/id_rsa_script {host} \"~/UDPing/sUDPingLnx {host}:{port} &\" &".format(host = hostname, port = port))
 
 def killUDPingOnServer(url):
+    print("Killing UDPing on the server.")
     hostname = getHostname(url)
     if (hostname not in MLCNET_SERVER_HOSTNAMES):
         return
