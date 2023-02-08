@@ -153,6 +153,10 @@ function display(){
     var player = dashjs.MediaPlayer().create();
     player.updateSettings({
         streaming: {
+        abr:{
+            useDefaultABRRules:true,
+            ABRStrategy:"abrThroughput"
+        },
         buffer:{
             bufferToKeep: 20, // Default
             stableBufferTime: 20, // Default: 12
