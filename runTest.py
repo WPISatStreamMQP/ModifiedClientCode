@@ -300,13 +300,14 @@ def downloadPacketsFromServer(url):
     # Delete packet file from linux.cs...
     os.system("ssh -i ~/.ssh/id_rsa_script linux.cs.wpi.edu \"rm ~/output.pcap\"")
 
+# Gets the port to ping on via the `PORT` global variable.
 def startUDPing():
     asyncio.set_event_loop(asyncio.new_event_loop())
     asyncio.get_event_loop()
     asyncio.get_child_watcher()
     print("Starting cUDPing process")
     # This will block until UDPing returns (when it finishes).
-    os.system("./cUDPingLnx -p 1234 -h mlcneta.cs.wpi.edu")
+    os.system("./cUDPingLnx -p {port} -h mlcneta.cs.wpi.edu".format(port = PORT))
     print("cUDPing process successfully killed.")
 
 def killUDPingProcess():
