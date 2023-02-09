@@ -48,6 +48,7 @@ TSHARK_FILEOUTPUT_COMMAND = "tshark -r {pcapName} -t r -T fields "\
                             "-E header=y -E separator=, "\
                             "-Y \"(ip.src == {serverIp}) || (ip.dst == {serverIp})\" "\
                             "> {csvName}"
+PORT = 1234
 
 class NonPromLiveCapture(LiveCapture):
     def get_parameters(self, packet_count=None):
@@ -90,6 +91,10 @@ def runSingleTest(url, netInterface):
     print("Starting Wireshark sniffer on server.")
     startTSharkOnServer(url)
 
+    # Start UDPing on the server. Do this early-ish because it may take some time to get going and we want our UDPing client to find it immediately once it starts.
+    print("Starting UDPing on server.")
+    startUDPingOnServer(url, PORT)
+
     # Start the client packet capture.
     # NOTE: I do this before anything else because after calling Thread.start(), it takes some time for the sniffing to actually get going. If I do it later, it's possible for it to miss part of the relevant data. It does include some extra stuff since it's so early, but it's necessary.
     shouldContinueSniffing = True
@@ -101,7 +106,7 @@ def runSingleTest(url, netInterface):
     # Start UDPing
     asyncio.set_event_loop(asyncio.new_event_loop())
     pingThread = Thread(target=startUDPing)
-    print("Starting UDPing")
+    print("Starting UDPing on client (here).")
     pingThread.start()
     
     options = Options()
@@ -143,10 +148,17 @@ def runSingleTest(url, netInterface):
         # Since the stream failed to finish, it has not saved the log. Do that for it.
         web_saveButton = ffDriver.find_element(By.ID, SAVE_BUTTON_ID)
         web_saveButton.click()
+    
 
-    print("Stopping UDPing")
+    
+    ########################### TEST IS COMPLETE at this point. Analysis is next.
+
+    print("Stopping UDPing on client (here).")
     killUDPingProcess()
     pingThread.join()
+
+    print("Stopping UDPing on server.")
+    killUDPingOnServer(url)
 
     print("Stopping server packet sniffer.")
     killTSharkOnServer(url)
@@ -154,7 +166,7 @@ def runSingleTest(url, netInterface):
     print("Stopping client (here) packet sniffer.")
     shouldContinueSniffing = False
     sniffThread.join()
-    print("Packet sniffer stop signal sent")
+    print("Packet sniffer stop signal sent.")
 
     # Ran this here because it takes time so we can use this wait to allow the local capture to stop.
     print("Downloading packet capture from server.")
@@ -252,6 +264,23 @@ def killTSharkOnServer(url):
     # We are accessing an MLCNet server, so we can do SSH commands to it.
     os.system("ssh -i ~/.ssh/id_rsa_script {host} \"pkill -15 tshark\"".format(host = hostname))
 
+# NON-BLOCKING. Will immediately return after launching sUDPingLnx.
+def startUDPingOnServer(url,port):
+    print("Starting UDPing on the server.")
+    hostname = getHostname(url)
+    if (hostname not in MLCNET_SERVER_HOSTNAMES):
+        return
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"~/UDPing/sUDPingLnx {host}:{port} &\" &".format(host = hostname, port = port))
+
+def killUDPingOnServer(url):
+    print("Killing UDPing on the server.")
+    hostname = getHostname(url)
+    if (hostname not in MLCNET_SERVER_HOSTNAMES):
+        return
+    os.system("ssh -i ~/.ssh/id_rsa_script {host} \"pkill -15 sUDPingLnx\"".format(host = hostname))
+
+
+
 def downloadPacketsFromServer(url):
     hostname = getHostname(url)
     if (hostname not in MLCNET_SERVER_HOSTNAMES):
@@ -271,13 +300,14 @@ def downloadPacketsFromServer(url):
     # Delete packet file from linux.cs...
     os.system("ssh -i ~/.ssh/id_rsa_script linux.cs.wpi.edu \"rm ~/output.pcap\"")
 
+# Gets the port to ping on via the `PORT` global variable.
 def startUDPing():
     asyncio.set_event_loop(asyncio.new_event_loop())
     asyncio.get_event_loop()
     asyncio.get_child_watcher()
     print("Starting cUDPing process")
     # This will block until UDPing returns (when it finishes).
-    os.system("./cUDPingLnx -p 1234 -h mlcneta.cs.wpi.edu")
+    os.system("./cUDPingLnx -p {port} -h mlcneta.cs.wpi.edu".format(port = PORT))
     print("cUDPing process successfully killed.")
 
 def killUDPingProcess():
