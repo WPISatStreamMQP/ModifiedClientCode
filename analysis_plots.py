@@ -37,6 +37,10 @@ def get_time_elapsed_stall_mapping(filename):
             y_sec = [round(x, 1) for x in y_dev]
             previous_time = float(log_elements[0])
 
+    if len(x) == 0:
+        print("No data in JS log file. Not outputting logs.")
+        return
+
     df = pd.DataFrame({'x': x, 'y': y_sec})
     num_col = df._get_numeric_data().columns[1]
 
@@ -52,7 +56,15 @@ def get_time_elapsed_stall_mapping(filename):
             "y": "Stalls(sec)",
         }, title="Stalls Statistics")
         #fig1.show()
+
     path_Name = os.path.join(os.getcwd(), 'Stall_Results', '{}_Statistics_.html'.format(filename))
+    if os.path.isfile(path_Name):
+        print("Stall statistics HTML page already exists. Deleting and recreating.")
+        try:
+            os.remove(path_Name)
+        except OSError:
+            print("Failed to delete stall statistics page. Giving up on these results.")
+            return
     fig1.write_html(path_Name)
 
     text_in = []
@@ -66,6 +78,13 @@ def get_time_elapsed_stall_mapping(filename):
     fig2.update_traces(textposition="top right")
 
     path_Name = os.path.join(os.getcwd(), 'Stall_Results', '{}_resultStallsResults_.html'.format(filename))
+    if os.path.isfile(path_Name):
+        print("Stall results HTML page already exists. Deleting and recreating.")
+        try:
+            os.remove(path_Name)
+        except OSError:
+            print("Failed to delete stall results page. Giving up on these results.")
+            return
     fig2.write_html(path_Name)
 
 
@@ -89,6 +108,10 @@ def get_time_elapsed_qual_mapping(filename):
             x.append(float(log_elements[0]))
             y.append(str(log_elements[2]))
 
+    if len(x) == 0:
+        print("No data in JS log file. Not outputting logs.")
+        return
+
     df = pd.DataFrame({'x': x, 'y': y})
     fig = px.line(df, x, y, labels={
         "x": "Time",
@@ -96,7 +119,15 @@ def get_time_elapsed_qual_mapping(filename):
     }, title="Resolution vs Time for: {}".format(filename))
     fig.update_yaxes(categoryorder='array',
                      categoryarray=['480x270', '640x360', '960x540','1280x720','1920x1080'])
+    
     path_Name = os.path.join(os.getcwd(), 'Qual_Results', '{}_resultQual_Time_.html'.format(filename))
+    if os.path.isfile(path_Name):
+        print("Quality level results HTML page already exists. Deleting and recreating.")
+        try:
+            os.remove(path_Name)
+        except OSError:
+            print("Failed to delete quality level results page. Giving up on these results.")
+            return
     fig.write_html(path_Name)
 
 
@@ -113,7 +144,15 @@ def analyze_size_of_buffer(log_file):
     fig = px.line(log_df, x="realtime_elapsed", y="current_size_of_buffer", title='realtime_elapsed vs current_size_of_buffer').update_layout(
         xaxis_title="realtime_elapsed(Sec)", yaxis_title="current_size_of_buffer(Sec)",xaxis_tickformat=',d'
     )
+    
     path_Name = os.path.join(os.getcwd(), 'Size_of_Buffer_Results', '{}_Size_of_Buffer_Results_.html'.format(log_file))
+    if os.path.isfile(path_Name):
+        print("Buffer size results HTML page already exists. Deleting and recreating.")
+        try:
+            os.remove(path_Name)
+        except OSError:
+            print("Failed to delete buffer size results page. Giving up on these results.")
+            return
     fig.write_html(path_Name)
 
 #  function for analyzing UDPing logs
@@ -140,13 +179,31 @@ def analyze_UDPing_logs(log_file):
     fig = px.bar(df_summary, title="RTT(ms) Statistics for: {}".format(log_file))
     fig.update_xaxes(title_text="Statistics")
     fig.update_yaxes(title_text="RTT(sec)")
+    
     path_Name = os.path.join(os.getcwd(), 'UDPing_Results', '{}_UDPing_Results_Summary_.html'.format(log_file))
+    if os.path.isfile(path_Name):
+        print("UDPing results HTML page already exists. Deleting and recreating.")
+        try:
+            os.remove(path_Name)
+        except OSError:
+            print("Failed to delete UDPing results page. Giving up on these results.")
+            return
     fig.write_html(path_Name)
+
+
     # whisker plot for RTT values in UDPing logs
     fig = px.box(data_frame=df1, x="rtt(ms)", orientation="h",
                  title="RTT(sec) Statistics from UDPing for: {}".format(log_file))
     fig.update_xaxes(title_text="RTT(sec)")
+    
     path_Name = os.path.join(os.getcwd(), 'UDPing_Results', '{}_UDPing_Results_Whisker_.html'.format(log_file))
+    if os.path.isfile(path_Name):
+        print("UDPing box-whisker HTML page already exists. Deleting and recreating.")
+        try:
+            os.remove(path_Name)
+        except OSError:
+            print("Failed to delete UDPing box-whisker results page. Giving up on these results.")
+            return
     fig.write_html(path_Name)
 
     # save df2 as csv
