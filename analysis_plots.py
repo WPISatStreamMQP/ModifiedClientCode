@@ -216,7 +216,7 @@ if __name__ == "__main__":
     # get all the files in the current directory and analyze them
     for root, dirs, files in os.walk(os.getcwd()):
         for file in files:
-            if file.endswith(".log") and file != "geckodriver.log":
+            if file.startswith("Tester") and file.endswith(".log"):
                 file_path = os.path.join(root, file)
                 print("Analyzing " + file)
                 get_time_elapsed_qual_mapping(file_path)
