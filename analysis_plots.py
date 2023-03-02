@@ -36,6 +36,10 @@ def get_time_elapsed_stall_mapping(filename):
             y_dev = np.divide(y, myInt)  # convert STALLS from ms to sec
             y_sec = [round(x, 1) for x in y_dev]
             previous_time = float(log_elements[0])
+    
+    if len(x) == 0:
+        print("No data in JS log file. Not outputting logs.")
+        return
 
     df = pd.DataFrame({'x': x, 'y': y_sec})
     num_col = df._get_numeric_data().columns[1]
@@ -115,6 +119,10 @@ def get_time_elapsed_qual_mapping(filename):
             log_elements = log_details.split(",")
             x.append(float(log_elements[0]))
             y.append(str(log_elements[2]))
+
+    if len(x) == 0:
+        print("No data in JS log file. Not outputting logs.")
+        return
 
     df = pd.DataFrame({'x': x, 'y': y})
     fig = px.line(df, x, y, labels={
