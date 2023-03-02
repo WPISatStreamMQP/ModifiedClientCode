@@ -218,7 +218,7 @@ if __name__ == "__main__":
     empty_files = []
     for root, dirs, files in os.walk(os.getcwd()):
         for file in files:
-            if file.endswith(".log") and file != "geckodriver.log":
+            if file.startswith("Tester") and file.endswith(".log"):
                 # skip empty files
                 if os.stat(os.path.join(root, file)).st_size == 0:
                     print("Skipping empty file: " + file)
