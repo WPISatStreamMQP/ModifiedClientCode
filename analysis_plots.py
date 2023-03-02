@@ -7,7 +7,15 @@ import math
 import os
 
 
-
+def set_std_plot_params(fig):
+    fig.update_layout(font = dict(size = 24))
+    # Remove the background coloring.
+    fig.update_layout({"plot_bgcolor": "rgba(0,0,0,0)",
+                       "paper_bgcolor": "rgba(0,0,0,0)"})
+    # Make the gridlines visible on the transparent background.
+    fig.update_xaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)",
+                     dtick = 1)
+    fig.update_yaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)")
 
 def get_time_elapsed_stall_mapping(filename):
     x = []
@@ -51,11 +59,13 @@ def get_time_elapsed_stall_mapping(filename):
     for i in num_col:
         if i in ['index']:
             continue
+        # title="Stalls Statistics"
         fig1 = px.bar(describe_num_df, x="index", y=i, text=i, labels={
             "x": "Statistics",
             "y": "Stalls(sec)",
-        }, title="Stalls Statistics")
+        })
         #fig1.show()
+    set_std_plot_params(fig1)
     path_Name = os.path.join(os.getcwd(), 'Stall_Results', '{}_Statistics_.html'.format(filename))
     fig1.write_html(path_Name)
 
@@ -63,11 +73,13 @@ def get_time_elapsed_stall_mapping(filename):
     for index in range(len(x)):
         text_in.append(y_sec[index])
 
+    # title="Stalls (sec) / Time(sec) for: {}".format(filename)
     fig2 = px.line(df, x='x', y='y',labels={
         "x": "Time (sec)",
         "y": "Stalls(sec)",
-    }, title="Stalls (sec) / Time(sec) for: {}".format(filename))
+    })
     fig2.update_traces(textposition="top right")
+    set_std_plot_params(fig2)
 
     path_Name = os.path.join(os.getcwd(), 'Stall_Results', '{}_resultStallsResults_.html'.format(filename))
     fig2.write_html(path_Name)
@@ -94,7 +106,6 @@ def calculate_table(filename):
                    fill_color='lavender',
                    align='left'))
     ])
-    summary_fig.update_layout(title="Table Summary Statistics for: {}".format(filename))
     path_Name = os.path.join(os.getcwd(), 'Table_Results', '{}_Table_.html'.format(filename))
     summary_fig.write_html(path_Name)
 
@@ -125,12 +136,14 @@ def get_time_elapsed_qual_mapping(filename):
         return
 
     df = pd.DataFrame({'x': x, 'y': y})
+    # title="Resolution vs Time for: {}".format(filename)
     fig = px.line(df, x, y, labels={
         "x": "Time",
         "y": "Resolution",
-    }, title="Resolution vs Time for: {}".format(filename))
+    })
     fig.update_yaxes(categoryorder='array',
                      categoryarray=['480x270', '640x360', '960x540','1280x720','1920x1080'])
+    set_std_plot_params(fig)
     path_Name = os.path.join(os.getcwd(), 'Qual_Results', '{}_resultQual_Time_.html'.format(filename))
     fig.write_html(path_Name)
 
@@ -149,9 +162,11 @@ def analyze_size_of_buffer(log_file):
     log_df = log_df.apply(pd.to_numeric)
     # log_df["realtime_elapsed"]=pd.to_numeric(log_df["realtime_elapsed"])
     log_df = log_df.dropna()
-    fig = px.line(log_df, x="realtime_elapsed", y="current_size_of_buffer", title='realtime_elapsed vs current_size_of_buffer').update_layout(
-        xaxis_title="realtime_elapsed(Sec)", yaxis_title="current_size_of_buffer(Sec)",xaxis_tickformat=',d'
+    log_df["realtime_elapsed_minutes"] = log_df["realtime_elapsed"] / 60
+    fig = px.line(log_df, x="realtime_elapsed_minutes", y="current_size_of_buffer").update_layout(
+        xaxis_title="realtime_elapsed(Min)", yaxis_title="current_size_of_buffer(Min)",xaxis_tickformat=',d'
     )
+    set_std_plot_params(fig)
     path_Name = os.path.join(os.getcwd(), 'Size_of_Buffer_Results', '{}_Size_of_Buffer_Results_.html'.format(log_file))
     fig.write_html(path_Name)
 
@@ -164,27 +179,36 @@ def analyze_UDPing_logs(log_file):
     df1 = df.iloc[:ping_statistics_row]
     df2 = df.iloc[ping_statistics_row:]
     df1['tSent(ms) '] = df1['tSent(ms) '].apply(lambda x: x / 1000)
+
     # Plot the RTT vs Time
-    fig = px.scatter(df1, x='tSent(ms) ', y='rtt(ms)', title='UDPing RTT vs Time for: {}'.format(log_file))
+    # title='UDPing RTT vs Time for: {}'.format(log_file)
+    fig = px.scatter(df1, x='tSent(ms) ', y='rtt(ms)')
+    set_std_plot_params(fig)
     fig.update_xaxes(title_text="Time sent (sec)")
     fig.update_yaxes(title_text="RTT(sec)")
     path_Name = os.path.join(os.getcwd(), 'UDPing_Results', '{}_UDPing_Results_.html'.format(log_file))
     fig.write_html(path_Name)
+
     # Plot the summary statistics
     df_summary = df1.describe()
     df_summary.drop(['bytes'], axis=1, inplace=True)
     df_summary.drop(['seq'], axis=1, inplace=True)
     df_summary.drop(['tSent(ms) '], axis=1, inplace=True)
     df_summary.drop(['count'], axis=0, inplace=True)
-    fig = px.bar(df_summary, title="RTT(ms) Statistics for: {}".format(log_file))
+    # title="RTT(ms) Statistics for: {}".format(log_file)
+    fig = px.bar(df_summary)
+    set_std_plot_params(fig)
     fig.update_xaxes(title_text="Statistics")
     fig.update_yaxes(title_text="RTT(sec)")
     path_Name = os.path.join(os.getcwd(), 'UDPing_Results', '{}_UDPing_Results_Summary_.html'.format(log_file))
     fig.write_html(path_Name)
+
     # whisker plot for RTT values in UDPing logs
-    fig = px.box(data_frame=df1, x="rtt(ms)", orientation="h",
-                 title="RTT(sec) Statistics from UDPing for: {}".format(log_file))
+    # title="RTT(sec) Statistics from UDPing for: {}".format(log_file)
+    fig = px.box(data_frame=df1, x="rtt(ms)", orientation="h")
     fig.update_xaxes(title_text="RTT(sec)")
+    set_std_plot_params(fig)
+    title='UDPing RTT vs Time for: {}'.format(log_file)
     path_Name = os.path.join(os.getcwd(), 'UDPing_Results', '{}_UDPing_Results_Whisker_.html'.format(log_file))
     fig.write_html(path_Name)
 
@@ -206,15 +230,16 @@ def analyze_packets(filtered_packets):
 
     df_new = df_new.groupby(grouping_attr)['frame.len'].sum().reset_index()
     df_new['frame.len'] = df_new['frame.len'].multiply(8e-6)  # multiply to get Mbit/s
+    
 
     fig2 = px.line(df_new,x="index",y="frame.len",
             labels={
                 "index":"Time(s)",
                 "frame.len":"bitrate(Mbit/s)"
-            }
-               ,title='Throughput')
+            })
+    set_std_plot_params(fig2)
     fig2.update_layout(showlegend=False)
-    fig2.update_layout(title_text='Throughput for: {}'.format(filtered_packets))
+    #fig2.update_layout(title_text='Throughput for: {}'.format(filtered_packets))
 
     path_Name = os.path.join(os.getcwd(), 'Throughput_Results', '{}_Throughput_Results_.html'.format(filtered_packets))
     fig2.write_html(path_Name)
