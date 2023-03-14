@@ -13,8 +13,7 @@ def set_std_plot_params(fig):
     fig.update_layout({"plot_bgcolor": "rgba(0,0,0,0)",
                        "paper_bgcolor": "rgba(0,0,0,0)"})
     # Make the gridlines visible on the transparent background.
-    fig.update_xaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)",
-                     dtick = 1)
+    fig.update_xaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)")
     fig.update_yaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)")
 
 def get_time_elapsed_stall_mapping(filename):
@@ -167,6 +166,8 @@ def analyze_size_of_buffer(log_file):
         xaxis_title="realtime_elapsed(Min)", yaxis_title="current_size_of_buffer(Min)",xaxis_tickformat=',d'
     )
     set_std_plot_params(fig)
+    fig.update_xaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)",
+                     dtick = 1)
     path_Name = os.path.join(os.getcwd(), 'Size_of_Buffer_Results', '{}_Size_of_Buffer_Results_.html'.format(log_file))
     fig.write_html(path_Name)
 
@@ -234,11 +235,19 @@ def analyze_packets(filtered_packets):
 
     fig2 = px.line(df_new,x="index",y="frame.len",
             labels={
-                "index":"Time(s)",
-                "frame.len":"bitrate(Mbit/s)"
+                "index":"Time (sec)",
+                "frame.len":"Bitrate (Mbit/sec)"
             })
-    set_std_plot_params(fig2)
-    fig2.update_layout(showlegend=False)
+    fig2.update_layout(font = dict(size = 24))
+    # Remove the background coloring.
+    fig2.update_layout({"plot_bgcolor": "rgba(0,0,0,0)",
+                       "paper_bgcolor": "rgba(0,0,0,0)"})
+    # Make the gridlines visible on the transparent background.
+    fig2.update_xaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)",
+                      linewidth = 2, linecolor = 'black')
+    fig2.update_yaxes(showgrid = True, gridwidth = 1, gridcolor = "rgba(169,169,169,0.5)",
+                      rangemode = "tozero")
+    #fig2.add_hline(y = 0, line_color = "rgba(0,0,0,0)")
     #fig2.update_layout(title_text='Throughput for: {}'.format(filtered_packets))
 
     path_Name = os.path.join(os.getcwd(), 'Throughput_Results', '{}_Throughput_Results_.html'.format(filtered_packets))
