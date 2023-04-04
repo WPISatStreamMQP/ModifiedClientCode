@@ -6,6 +6,14 @@ import re
 import math
 import os
 
+reso_to_qual_level = {
+    "480x270": 1,
+    "640x360": 2,
+    "960x540": 3,
+    "1280x720": 4,
+    "1920x1080": 5,
+    "3840x2160": 6,
+}
 
 def set_std_plot_params(fig):
     fig.update_layout(font = dict(size = 24))
@@ -122,26 +130,34 @@ def get_time_elapsed_qual_mapping(filename):
             if row_element[0] == 'STALL':
                 continue
             if row_element[0] == 'QUAL':
-                y.append(str(row_element[4]))
+                y.append(reso_to_qual_level[str(row_element[4])])
                 x.append(float(row_element[2]))
                 continue
             log_details = row_element[1]
             log_elements = log_details.split(",")
             x.append(float(log_elements[0]))
-            y.append(str(log_elements[2]))
+            y.append(reso_to_qual_level[str(log_elements[2])])
 
     if len(x) == 0:
         print("No data in JS log file. Not outputting logs.")
         return
 
-    df = pd.DataFrame({'x': x, 'y': y})
+    df = pd.DataFrame({'time_sec': x, 'quality_level': y})
+    df["time_min"] = np.divide(df["time_sec"], 60)
     # title="Resolution vs Time for: {}".format(filename)
-    fig = px.line(df, x, y, labels={
+    """fig = px.line(df, x, y, labels={
         "x": "Time",
-        "y": "Resolution",
+        "y": "Quality Level",
+    })"""
+    fig = px.line(x = df["time_min"], y = df["quality_level"], labels = {
+        "x": "Time (min)",
+        "y": "Quality Level"
     })
-    fig.update_yaxes(categoryorder='array',
-                     categoryarray=['480x270', '640x360', '960x540','1280x720','1920x1080'])
+    #fig.update_yaxes(categoryorder='array',
+    #                 categoryarray=['480x270', '640x360', '960x540','1280x720','1920x1080'])
+    # Thicken the data lines.
+    fig.update_traces(line = dict(width = 5))
+    fig.update_yaxes(categoryorder = "array", categoryarray = list(range(1, 7))) # Range from 1 to 6 inclusive.
     set_std_plot_params(fig)
     path_Name = os.path.join(os.getcwd(), 'Qual_Results', '{}_resultQual_Time_.html'.format(filename))
     fig.write_html(path_Name)
